@@ -1,0 +1,7 @@
+numpy
+pandas
+cvxpy
+osqp
+matplotlib
+seaborn
+argparse
