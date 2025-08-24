@@ -1,0 +1,36 @@
+2025-08-24 19:22:59,194 - nutpred - INFO - nutpred package version 0.0.0 initialized
+2025-08-24 19:23:02,923 - nutpred.pred_by_fullnut - INFO - XGBoost available for training
+2025-08-24 19:23:03,744 - __main__ - INFO - Starting nutpred CLI execution
+2025-08-24 19:23:03,755 - __main__ - INFO - Arguments: snack_csv=data/snack_input_df.csv, thesaurus_xlsx=data/THESAURUSFORPUBLICRELEASE.XLSX, ingnut_csv=data/ingnut_df_top135.csv, outdir=./outputs
+2025-08-24 19:23:03,755 - __main__ - INFO - Parameters: top_n=135, test_size=0.2, cv=3, opt_constraint=nnls_mono, opt_solver=osqp
+2025-08-24 19:23:03,756 - __main__ - INFO - Created output directory: ./outputs
+2025-08-24 19:23:03,756 - __main__ - INFO - Step 1: Loading and preprocessing data
+2025-08-24 19:23:03,756 - nutpred.preprocess - INFO - Loading snack data from: data/snack_input_df.csv
+2025-08-24 19:23:03,944 - nutpred.preprocess - INFO - Loaded snack data: (18588, 19)
+2025-08-24 19:23:03,944 - nutpred.preprocess - INFO - Loading thesaurus from: data/THESAURUSFORPUBLICRELEASE.XLSX
+2025-08-24 19:23:05,648 - nutpred.preprocess - INFO - Loaded thesaurus: (25671, 3)
+2025-08-24 19:23:05,648 - __main__ - INFO - Loaded snack data: (18588, 19), thesaurus: (25671, 3)
+2025-08-24 19:23:05,648 - nutpred.preprocess - INFO - Creating mapped_list column using thesaurus mapping
+2025-08-24 19:23:05,664 - nutpred.preprocess - INFO - Using thesaurus columns: 'Parsed ingredient term' -> 'Preferred descriptor'
+2025-08-24 19:23:05,664 - nutpred.preprocess - INFO - Using ingredient column: ingredients
+2025-08-24 19:23:05,664 - nutpred.preprocess - INFO - Creating ingredient_list_raw column
+2025-08-24 19:23:09,853 - nutpred.preprocess - INFO - Creating mapped_list column
+2025-08-24 19:23:10,017 - nutpred.preprocess - INFO - Mapped 185898 total ingredients to 5250 unique ingredients
+2025-08-24 19:23:10,019 - __main__ - INFO - Ensured mapped_list column
+2025-08-24 19:23:10,019 - __main__ - INFO - Filtering out: ('popcorn', 'pretzel', 'pretzels')
+2025-08-24 19:23:10,182 - __main__ - INFO - After filtering: (18248, 21)
+2025-08-24 19:23:10,785 - __main__ - INFO - Ensured UMAP columns
+2025-08-24 19:23:10,786 - __main__ - INFO - Step 2: Building feature sets
+2025-08-24 19:23:10,832 - __main__ - INFO - Created top-135 ingredient list
+2025-08-24 19:23:11,776 - __main__ - INFO - Built binary features: (18248, 135), score features: (18248, 135)
+2025-08-24 19:23:11,798 - __main__ - INFO - Joined feature sets. Final shape: (18248, 301)
+2025-08-24 19:23:11,798 - __main__ - INFO - Step 3: Selecting columns
+2025-08-24 19:23:11,798 - __main__ - INFO - Selected columns: nut8=8, targets=3, umap=10, binary=135, score=135
+2025-08-24 19:23:11,805 - __main__ - INFO - Step 4: Ingredient-nutrient optimization
+2025-08-24 19:23:11,805 - __main__ - INFO - Loaded ingnut data: (135, 28)
+2025-08-24 19:23:11,805 - __main__ - INFO - Using ingnut columns: ['Energy', 'Protein', 'Total lipid (fat)', 'Carbohydrate, by difference', 'Fiber, total dietary', 'Calcium, Ca', 'Iron, Fe', 'Sodium, Na', 'Potassium, K']
+2025-08-24 19:23:11,805 - nutpred.pred_by_ingnut - INFO - Starting ingredient-nutrient prediction with 18248 samples, 9 features
+2025-08-24 19:23:11,805 - nutpred.pred_by_ingnut - INFO - Parameters: resolver=cosine, constraint=nnls_mono, ridge=0.0, robust=False, solver=osqp
+2025-08-24 19:23:11,805 - nutpred.pred_by_ingnut - INFO - Creating variant_key index for ingnut_df
+2025-08-24 19:23:11,813 - nutpred.pred_by_ingnut - INFO - Data shapes: X_all=(135, 9), Y_mat=(18248, 8), K=135 variants
+2025-08-24 19:23:11,816 - nutpred.pred_by_ingnut - INFO - Built 133 ingredient groups
