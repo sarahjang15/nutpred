@@ -39,12 +39,28 @@ This repo provides a clean, reproducible pipeline with manual metrics (including
 
 ```
 nutpred/
-init.py
-cleaning.py # robust ingredient text cleaner
-metrics.py # r2_manual (SSR/SST), SMAPE
-preprocess.py # load, map to thesaurus, filter, top-K, binary/score, umap_10 expansion
-pred_by_ingnut.py # CVXPY optimizer → ing_pred (and its metrics)
-pred_by_fullnut.py # XGBoost/RF training for 4 ML feature sets
-viz.py # heatmaps for R², RMSE, SMAPE
-cli.py # end-to-end command-line pipeline
+├── README.md
+├── pyproject.toml
+├── requirements.txt
+├── LICENSE
+├── .gitignore
+├── nutpred/ # Python package
+│ ├── init.py
+│ ├── cleaning.py # robust ingredient text cleaner
+│ ├── metrics.py # r2_manual (SSR/SST), SMAPE
+│ ├── preprocess.py # load → map to thesaurus → filter → top-K → binary/score → expand umap_10
+│ ├── pred_by_ingnut.py # CVXPY optimizer → ing_pred (and its metrics)
+│ ├── pred_by_fullnut.py # XGBoost/RF for: nut8, nut8+binary, nut8+score, nut8+umap_10
+│ ├── viz.py # heatmaps for R², RMSE, SMAPE
+│ └── cli.py # end-to-end command-line entrypoint
+├── data/ # (not tracked) put your inputs here
+│ ├── snack_input_df.csv
+│ ├── THESAURUSFORPUBLICRELEASE.xlsx
+│ └── ingnut_df_top135.csv
+├── outputs/ # pipeline writes here (metrics, plots, processed CSV)
+│ └── .gitkeep
+├── notebooks/ # optional exploratory work
+│ └── exploration.ipynb
+└── tests/ # optional unit tests
+└── test_metrics.py
 ```
