@@ -5,3 +5,7 @@ osqp
 matplotlib
 seaborn
 argparse
+matplotlib
+scikit-learn
+openpyxl
+xgboost
