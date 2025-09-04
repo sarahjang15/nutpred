@@ -1,0 +1,35 @@
+Nutrient,FeatureSet,Filter,SampleType,R2,RMSE,MAE,SMAPE
+Calcium(mg),ing_pred,strict,all,-0.7779,36453.8829,99.6153,146.0149
+Calcium(mg),ing_pred,strict,test,-11.7215,38178.9641,126.9711,148.2683
+Calcium(mg),nut8,strict,test,0.9628,10.5641,8.105,106.7365
+Calcium(mg),nut8+binary,strict,test,0.9628,10.5692,8.1711,106.5676
+Calcium(mg),nut8+score,strict,test,0.9605,10.8943,7.6377,89.6657
+Calcium(mg),nut8+umap_10,strict,test,0.9623,10.6437,8.1059,105.1048
+Carbohydrate(g),ing_pred,strict,all,-11.1131,1271.4397,27.8104,79.0864
+Carbohydrate(g),ing_pred,strict,test,-26.0316,896.7061,24.5808,68.4847
+Cholesterol(mg),ing_pred,strict,all,0.0,18.7733,3.5895,199.9987
+Cholesterol(mg),ing_pred,strict,test,0.0,18.529,3.79,199.9975
+Energy(kcal),ing_pred,strict,all,-17.5196,31314.9753,121.8201,33.3193
+Energy(kcal),ing_pred,strict,test,-61.6878,37496.0123,109.5705,31.7651
+Fiber(g),ing_pred,strict,all,-0.803,16.7304,2.5829,66.8726
+Fiber(g),ing_pred,strict,test,-15.8027,2.8238,1.379,64.5765
+Fiber(g),nut8,strict,test,-0.2001,0.4491,0.1834,6.0122
+Fiber(g),nut8+binary,strict,test,-0.2001,0.4491,0.1834,6.0122
+Fiber(g),nut8+score,strict,test,-0.2001,0.4491,0.1834,6.0122
+Fiber(g),nut8+umap_10,strict,test,-0.2001,0.4491,0.1834,6.0122
+Iron(mg),ing_pred,strict,all,-1.2682,2.864,1.1413,89.2814
+Iron(mg),ing_pred,strict,test,-0.4421,0.6469,0.6713,77.7257
+Iron(mg),nut8,strict,test,0.9999,0.0074,0.0043,33.5453
+Iron(mg),nut8+binary,strict,test,0.9999,0.0074,0.0043,33.5453
+Iron(mg),nut8+score,strict,test,0.9999,0.0074,0.0043,33.5453
+Iron(mg),nut8+umap_10,strict,test,0.9999,0.0074,0.0043,33.5453
+Protein(g),ing_pred,strict,all,-36.0849,989.7655,28.6044,125.4858
+Protein(g),ing_pred,strict,test,-490.152,913.3094,27.5249,128.3227
+Saturated fatty acids(g),ing_pred,strict,all,-2.484,38.1892,5.3619,177.2484
+Saturated fatty acids(g),ing_pred,strict,test,-1.6014,61.5708,6.909,155.6623
+Sodium(mg),ing_pred,strict,all,-4.1569,549902.008,664.9827,192.8666
+Sodium(mg),ing_pred,strict,test,-7.3695,298882.0413,511.8961,187.9133
+Total fat(g),ing_pred,strict,all,-11.8811,660.9584,24.4717,142.3147
+Total fat(g),ing_pred,strict,test,-27.0692,675.7297,25.3182,139.5489
+Total sugar(g),ing_pred,strict,all,-1771.6878,235100.3089,190.543,165.1994
+Total sugar(g),ing_pred,strict,test,-3546.9206,966036.034,463.1435,163.9785

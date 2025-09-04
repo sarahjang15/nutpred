@@ -16,8 +16,7 @@ __all__ = [
     "preprocess",
     "pred_by_ingnut",
     "pred_by_fullnut",
-    "viz",
-    "cli",
+    "viz"
 ]
 __version__ = "0.0.0"
 

@@ -2,12 +2,11 @@ import re
 import logging
 from typing import List
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
+# ---- Split on top-level commas/periods (ignore those inside () and []) --------
 def split_top_level(text: str) -> List[str]:
-    """Split by top-level commas/periods (ignore those inside () or [])."""
     parts, buf = [], []
     depth_par = depth_brk = 0
     for c in text:
@@ -29,128 +28,168 @@ def split_top_level(text: str) -> List[str]:
     if last: parts.append(last)
     return parts
 
-# Lead-ins like "contains 2% or less of:", "and less than 2% of the following:", etc.
+# ==== Patterns =================================================================
+
+# Global leading "Ingredients:" or "<flavor> Ingredients:" at the very start
+_GLOBAL_ING_HEADER = re.compile(r'(?ix)^\s*(?:[\w&/+\- ]+\s+){0,5}?ingredients?\s*:\s*')
+
+# Mid-string "<flavor> Ingredients:" after '.' or ';'
+_SECTION_HEADER_ANYWHERE = re.compile(r'(?ix)(?:^|(?<=[.;]))\s*[\w&/+\- ]+\s+ingredients?\s*:\s*')
+
+# Leading "made with ... and " clause (delete entirely)
+_MADE_WITH_DELETE = re.compile(r'(?ix)^\s*made\s+with\s+[^,.;()]+?\s+and\s+')
+
+# Token-level prefixes to strip but keep the trailing items
+#   e.g., "contains less than 2% of: X", "contains one or more of the following: X", "contains: X"
 _CONTAINS_PREFIX = re.compile(
-    r"""(?ix) ^
+    r'''(?ix)^
         \s*
-        (?:and\s+)?less\s+than\s+\d+%?\s+of(?:\s+the\s+following)?\s*:? |
-        (?:may\s+)?contains?\s+\d+%?\s*(?:or\s+less|or\s+more)?\s*(?:of\s*:?) |
-        (?:may\s+)?contains?\s+(?:one\s+or\s+more\s+of\s+the\s+following:\s*) |
-        (?:may\s+)?contains?\s*:?
-    """
+        (?:may\s+)?contains?              # "contain/contains/may contain"
+        (?:\s+\d+%?\s*(?:or\s+less|or\s+more)?)?   # optional "2% or less"
+        (?:\s+of)?                         # optional "of"
+        (?:\s+(?:one\s+or\s+more\s+)?of\s+the\s+following)?   # optional "of the following"
+        \s*:\s*
+    '''
 )
 
-# Pattern for "less than 2 of each of the following [ingredient]"
+# Another common header: "and less than 2% of (the following):"
+_LESS_THAN_PREFIX = re.compile(
+    r'''(?ix)^
+        \s*
+        (?:and\s+)?less\s+than\s+\d+%?\s+of
+        (?:\s+the\s+following)?
+        \s*:\s*
+    '''
+)
+
+# "less than X of each of the following: ..." → keep only the list after the lead-in
 _LESS_THAN_EACH_PATTERN = re.compile(
-    r"""(?ix)
+    r'''(?ix)
         (?:and\s+)?less\s+than\s+\d+\s+of\s+each\s+of\s+the\s+following\s*:?\s*
         (.+)
-    """
+    '''
 )
 
-def _strip_contains_prefix(s: str) -> str:
-    original = s
-    cleaned = _CONTAINS_PREFIX.sub('', s).strip()
-    if original != cleaned:
-        logger.info(f"Stripped contains prefix: '{original}' -> '{cleaned}'")
-    return cleaned
+# ==== Helpers ==================================================================
+
+def _strip_nested_parens_and_brackets(s: str) -> str:
+    """Remove nested (...) and [...] by iteratively stripping innermost groups."""
+    prev = None
+    out = s
+    while prev != out:
+        prev = out
+        out = re.sub(r'\([^()]*\)', '', out)
+    prev = None
+    while prev != out:
+        prev = out
+        out = re.sub(r'\[[^\[\]]*\]', '', out)
+    return out
 
 def _clean_less_than_each_pattern(s: str) -> str:
-    """Clean patterns like 'less than 2 of each of the following sea salt' -> 'sea salt'"""
-    original = s
-    match = _LESS_THAN_EACH_PATTERN.match(s)
-    if match:
-        cleaned = match.group(1).strip()
-        logger.info(f"Cleaned 'less than X of each' pattern: '{original}' -> '{cleaned}'")
+    m = _LESS_THAN_EACH_PATTERN.match(s)
+    if m:
+        cleaned = m.group(1).strip()
+        logger.info(f"Cleaned 'less than X of each' pattern: '{s}' -> '{cleaned}'")
         return cleaned
     return s
 
-def clean_ingredient_text(text):
+
+def clean_ingredient_text(text) -> List[str]:
     """
-    Turn an INGREDIENTS string into a clean list of tokens.
-    - drops bracketed sublists but keeps the head phrase (e.g., "... seasoning [salt,...]" -> "... seasoning")
-    - strips 'contains/less than 2% of the following' style prefixes
-    - handles 'less than X of each of the following [ingredient]' patterns
+    Turn an INGREDIENTS string into a clean, de-duplicated list (preserve first occurrence).
+
+    Rules:
+      • Drop global or mid-string "<flavor> Ingredients:" headers.
+      • Drop a leading "made with ... and " clause entirely (do not keep).
+      • Keep items after "contains ... (of the following):" by stripping the header only.
+      • Collapse nested parentheses/brackets to keep only the head phrase.
+      • Canonicalize some common variants and de-duplicate.
     """
     text = str(text).strip()
-    if not text: 
-        logger.debug("Empty text input, returning empty list")
+    if not text:
         return []
-    
-    logger.info(f"Cleaning ingredient text: '{text[:100]}{'...' if len(text) > 100 else ''}'")
-    
+
+    #logger.info(f"Cleaning ingredient text: '{text[:100]}{'...' if len(text) > 100 else ''}'")
     text = text.lower()
+
+    # (0) Delete leading "made with ... and " clause if present (company-specific pattern)
+    text2 = _MADE_WITH_DELETE.sub('', text)
+    if text2 != text:
+        logger.info("Removed leading 'made with ... and' clause.")
+        text = text2
+
+    # (1) Drop a global "Ingredients:" / "<flavor> Ingredients:" at the very start
+    text = _GLOBAL_ING_HEADER.sub('', text)
+
+    # (2) Remove mid-string "<flavor> Ingredients:" headers (e.g., ".Strawberry Ingredients:")
+    text = _SECTION_HEADER_ANYWHERE.sub(' ', text)
+
+    # (3) Normalize braces for the splitter
     text = text.replace('{', '(').replace('}', ')')
-    text = re.sub(r'^\s*ingredients?\s*:\s*', '', text, flags=re.I)
+
+    # (4) Split by top-level separators
     parts = split_top_level(text)
 
-    cleaned = []
-    for i, part in enumerate(parts):
+    cleaned: List[str] = []
+    for part in parts:
         ing = part.strip()
-        if not ing: continue
+        if not ing:
+            continue
 
-        logger.debug(f"Processing part {i+1}: '{ing}'")
-
-        # Clean "less than X of each of the following" patterns
+        # Keep only the list after "less than X of each of the following:"
         ing = _clean_less_than_each_pattern(ing)
 
-        # explicit "(contains ...)" → drop
-        original_ing = ing
+        # Strip token-level headers like "contains ...", "and less than ... of (the following):"
+        ing_before = ing
+        ing = _CONTAINS_PREFIX.sub('', ing)
+        ing = _LESS_THAN_PREFIX.sub('', ing)
+        if ing != ing_before and not ing:
+            # If stripping left the token empty, skip it.
+            continue
+
+        # Remove explicit "(contains ...)" clauses inside tokens
         ing = re.sub(r'\(\s*(?:may\s+)?contains?.*?\)', '', ing, flags=re.I)
-        if original_ing != ing:
-            logger.info(f"Removed contains clause: '{original_ing}' -> '{ing}'")
 
-        # drop bracketed/parenthetical sublists; keep head
-        original_ing = ing
-        ing = re.sub(r'\[[^\]]*\]', '', ing)
-        ing = re.sub(r'\([^)]*\)', '', ing)
-        if original_ing != ing:
-            logger.info(f"Removed brackets/parentheses: '{original_ing}' -> '{ing}'")
+        # Remove nested parentheses/brackets entirely (robust against nesting)
+        ing = _strip_nested_parens_and_brackets(ing)
 
-        # strip leading "contains/less than 2% ..." prefixes
-        ing = _strip_contains_prefix(ing)
-
-        # leading connectors
-        original_ing = ing
+        # Leading connectors
         ing = re.sub(r'^(?:and\/or|and or|and|or|andor)\s+', '', ing)
-        if original_ing != ing:
-            logger.debug(f"Removed leading connector: '{original_ing}' -> '{ing}'")
 
-        # descriptive lead-ins
-        original_ing = ing
-        ing = re.sub(r'^\s*(?:made\s+with|made\s+of|made\s+from)\s*:\s*', '', ing)
+        # Descriptive lead-ins — keep "made with" only if it’s *not* the head clause we removed already
+        ing = re.sub(r'^\s*(?:made\s+of|made\s+from)\s*:\s*', '', ing)
         ing = re.sub(r'^\s*(?:includes?|including|containing)\s*:\s*', '', ing)
         ing = re.sub(r'^\s*if[^,;]*', '', ing)
-        if original_ing != ing:
-            logger.debug(f"Removed descriptive lead-in: '{original_ing}' -> '{ing}'")
 
-        # fallback prefix
-        original_ing = ing
+        # Fallback numeric prefix like "2% or less of ..."
         ing = re.sub(r'^\s*\d+%?\s*(?:or\s+less|or\s+more)?\s*(?:of\s*:?)\s*', '', ing)
-        if original_ing != ing:
-            logger.debug(f"Removed fallback prefix: '{original_ing}' -> '{ing}'")
 
-        # normalize
-        original_ing = ing
+        # Normalize characters & spaces
         ing = re.sub(r'[^a-z0-9\s\-&/#]', '', ing).strip()
         ing = re.sub(r'\s+', ' ', ing)
         ing = ing.replace('andor', 'and/or')
-        if ing in ('natural flavors', 'natural flavoring'): 
+
+        # Canonicalize some variants
+        if ing in ('natural flavors', 'natural flavoring'):
             ing = 'natural flavor'
-            logger.debug("Normalized 'natural flavors' -> 'natural flavor'")
-        if ing == 'thiamine mononitrate': 
+        if ing == 'thiamine mononitrate':
             ing = 'thiamin mononitrate'
-            logger.debug("Normalized 'thiamine mononitrate' -> 'thiamin mononitrate'")
+
+        # Trim trailing connectors like "... and"
         ing = re.sub(r'(?:\s+(?:and|or|and\/or))+$', '', ing)
-        
-        if original_ing != ing:
-            logger.debug(f"Normalized text: '{original_ing}' -> '{ing}'")
 
-        if ing: 
+        if ing:
             cleaned.append(ing)
-            logger.debug(f"Added cleaned ingredient: '{ing}'")
-        else:
-            logger.debug(f"Skipped empty ingredient after cleaning")
 
-    logger.info(f"Cleaning complete. Input: {len(parts)} parts, Output: {len(cleaned)} ingredients")
-    return cleaned
+    # De-duplicate while preserving order
+    seen, unique = set(), []
+    for ing in cleaned:
+        if ing and ing not in seen:
+            seen.add(ing)
+            unique.append(ing)
+
+    #logger.info(f"Cleaning complete. Input parts={len(parts)}, Output unique ingredients={len(unique)}")
+    return unique
+
+
+__all__ = [clean_ingredient_text]

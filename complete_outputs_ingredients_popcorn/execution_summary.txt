@@ -1,0 +1,48 @@
+
+NUTPRED COMPLETE PIPELINE EXECUTION SUMMARY
+==========================================
+
+EXECUTION DETAILS:
+- Start time: 2025-08-30 15:09:47
+- Output directory: complete_outputs_ingredients_popcorn
+- Filter type: ingredients
+- Filter values: ['popcorn']
+
+INPUT DATA:
+- Food data: 18588 samples, 22 total features
+- Filtered data: 18419 samples, 327 total features
+- Thesaurus: 25671 ingredient mappings
+- Ingredient-nutrient data: 135 variants, 8 nutrients
+
+PROCESSING RESULTS:
+- Top 135 ingredients selected for feature engineering
+- 135 binary features created
+- 135 score features created  
+- 10 UMAP features used
+- 11 base nutrients predicted
+- 3 target nutrients predicted
+
+MODEL PERFORMANCE:
+- Optimization solver: OSQP with nnls_mono constraint
+- ML models trained: 5 different feature combinations (evaluated on strict and all samples)
+- Total model evaluations: 35 (including cross-validation and filter breakdowns)
+
+OUTPUT FILES GENERATED:
+1. snack_df_complete.csv - Complete dataset with all predictions
+2. ingredient_parsing_summary.csv - Ingredient parsing and mapping results
+3. metrics_all_models.csv - Performance metrics for all models
+4. ingredient_weights.csv - Optimization weights for each sample
+5. model_comparison_summary.csv - Aggregated model performance comparison
+6. feature_comparison.png - Visualization of model performance
+7. plots/ - Directory containing scatterplots and SHAP plots (if ML training succeeded)
+8. nutpred_complete.log - Detailed execution log
+
+KEY FINDINGS:
+- Best performing feature set: Fiber(g) - nut8 (all)
+- Average R2 across all models: -4.4947
+- Total ingredients processed: 172541
+- Unique base ingredients: 4782
+- Unique mapped ingredients (including variants): 4782
+
+EXECUTION STATUS: COMPLETED SUCCESSFULLY
+        

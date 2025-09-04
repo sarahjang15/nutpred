@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 import logging
-from typing import List
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
+from typing import List, Tuple
+from sklearn.model_selection import GridSearchCV
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import mean_squared_error, mean_absolute_error, mean_absolute_percentage_error, r2_score
 from nutpred.metrics import r2_manual, smape
+from nutpred.preprocess import is_first_mapped
 
 logger = logging.getLogger(__name__)
 
@@ -42,112 +44,133 @@ def _get_estimator_and_grid(force_rf: bool=False):
         logger.info("Using RandomForest with hyperparameter grid")
     return est, grid, model_name
 
-def train_eval_sets(
-    df: pd.DataFrame,
-    targets: List[str],
+def _handle_nan_features(X: np.ndarray, feature_set_name: str = "") -> np.ndarray:
+    """Helper function to handle NaN values in feature matrices consistently."""
+    if np.any(pd.isna(X)):
+        if feature_set_name:
+            logger.warning(f"NaN values found in features for {feature_set_name}, using median imputation") 
+        imputer = SimpleImputer(strategy='median')
+        X = imputer.fit_transform(X)
+    return X
+
+def _calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray, nutrient: str, feature_set_name: str, filter_name: str, sample_type: str) -> dict:
+    """Helper function to calculate metrics consistently."""
+    r2 = r2_score(y_true, y_pred)
+    rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+    mae = float(mean_absolute_error(y_true, y_pred))
+    mape = float(mean_absolute_percentage_error(y_true + 1e-6, y_pred))
+    s = smape(y_true, y_pred)
+    
+    return {
+        "Nutrient": nutrient, 
+        "FeatureSet": feature_set_name, 
+        "Model": "XGBoost",  # This will be updated by caller
+        "Filter": filter_name, "SampleType": sample_type,
+        "R2": r2, "RMSE": rmse, "MAE": mae, "MAPE": mape, "SMAPE": s
+    }
+
+def train_tree_models(
+    df: pd.DataFrame,  # This will be strict_df from run.py
     feature_sets: dict,
-    test_size: float = 0.2,
+    targets: List[str],
+    test_indices: List[int],
     random_state: int = 42,
     cv: int = 3,
-    force_rf: bool = False
-) -> pd.DataFrame:
+    force_rf: bool = False                                                                                             
+) -> Tuple[pd.DataFrame, dict]:
     """
-    Evaluate multiple ML feature sets using cross-validation.
+    Train ML models on strict_df and evaluate on test set + remaining strict samples.
     """
+    # Apply failed filter to get final strict samples for ML
+    success_mask = (df["failed"] == 0)
+    success_indices = df[success_mask].index.tolist()
+   
+    final_df = df[success_mask]
+    logger.info(f"   Final strict samples (first_mapped & optimization_success):: {len(final_df)}")
+
+    test_indices = final_df[final_df.index.isin(test_indices)].index.tolist()
+    train_indices = ~np.isin(final_df.index, test_indices)
+    logger.info(f"   Test indices after filtering out failed samples: {len(test_indices)}")
+
     logger.info(f"Starting ML training with {len(targets)} targets and {len(feature_sets)} feature sets")
-    logger.info(f"Parameters: test_size={test_size}, cv={cv}, force_rf={force_rf}")
+    logger.info(f"Parameters: test_size={len(test_indices)}, cv={cv}, force_rf={force_rf}")
     
-    # Create first_mapped filter
-    def is_first_mapped(mapped_list):
-        if not isinstance(mapped_list, list) or len(mapped_list) == 0:
-            return False
-        # Check if the first ingredient is mapped (not empty string)
-        return mapped_list[0].strip() != ""
+    logger.info(f"Training ML models on {len(final_df)} strict samples")
     
-    first_mapped_mask = df['mapped_list'].apply(is_first_mapped)
-    logger.info(f"First mapped samples: {first_mapped_mask.sum()}/{len(df)}")
-    
-    # Filter to only first_mapped samples
-    df_filtered = df[first_mapped_mask].reset_index(drop=True)
-    logger.info(f"Using filtered dataset: {len(df_filtered)} samples")
-    
-    idx = np.arange(len(df_filtered))
-    tr, te = train_test_split(idx, test_size=test_size, random_state=random_state)
-    logger.info(f"Train/test split: {len(tr)} train, {len(te)} test samples")
-    
-    est_base, param_grid, model_name = _get_estimator_and_grid(force_rf)
+    # Check if we have enough samples for train/test split
+    if len(final_df) < 10:
+        logger.error(f"Not enough samples for ML training: {len(final_df)} samples")
+        raise ValueError(f"Not enough samples for ML training: {len(final_df)} samples. Need at least 10 samples.")
 
     results = []
+    models_dict = {}  # Store trained models for SHAP analysis
+    
     for nutrient in targets:
         logger.info(f"Training models for nutrient: {nutrient}")
-        y = df_filtered[nutrient].to_numpy(float)
-        y_tr, y_te = y[tr], y[te]
-        
-        # Filter out NaN values
-        valid_mask = ~np.isnan(y_tr)
-        if not np.any(valid_mask):
-            logger.warning(f"No valid training data for {nutrient}")
-            continue
-            
-        y_tr_valid = y_tr[valid_mask]
-        tr_valid = tr[valid_mask]
+        y = final_df[nutrient]
+        y_valid_mask = ~pd.isna(y)
+        #test_indices = [i for i in test_indices if i in y_valid_mask]
+        #train_indices = [i for i in train_indices if i in y_valid_mask]
+        y_tr_valid, y_te_valid = y[train_indices].to_numpy(float), y[test_indices].to_numpy(float)
         
         logger.info(f"Valid training samples for {nutrient}: {len(y_tr_valid)}")
 
         for feature_set_name, feature_cols in feature_sets.items():
+            # Initialize models dict for this feature set if not exists
+            if feature_set_name not in models_dict:
+                models_dict[feature_set_name] = {}
             logger.info(f"Training ML model with {feature_set_name} features for {nutrient}")
             
             # Check if all feature columns exist
-            missing_cols = [col for col in feature_cols if col not in df_filtered.columns]
+            missing_cols = [col for col in feature_cols if col not in df.columns]
             if missing_cols:
                 logger.warning(f"Missing columns for {feature_set_name}: {missing_cols}")
                 continue
             
-            Xtr = df_filtered.loc[tr_valid, feature_cols].to_numpy(float)
-            Xte = df_filtered.loc[te, feature_cols].to_numpy(float)
+            Xtr = final_df.loc[train_indices, feature_cols].to_numpy(float)
+            Xte = final_df.loc[test_indices, feature_cols].to_numpy(float)
             
-            # Check for NaN values in features
-            if np.any(np.isnan(Xtr)) or np.any(np.isnan(Xte)):
-                logger.warning(f"NaN values found in features for {feature_set_name}, skipping")
-                continue
+            # Handle NaN values consistently
+            Xtr = _handle_nan_features(Xtr, feature_set_name)
+            Xte = _handle_nan_features(Xte, feature_set_name)
             
             logger.debug(f"Feature matrix shapes: Xtr={Xtr.shape}, Xte={Xte.shape}")
             
             try:
-                est = est_base.__class__(**est_base.get_params())
+                # Train the model with grid search
+                est, param_grid, model_name = _get_estimator_and_grid(force_rf)
                 grid = GridSearchCV(est, param_grid, scoring="neg_root_mean_squared_error", cv=cv, n_jobs=-1)
                 grid.fit(Xtr, y_tr_valid)
+                
+                # Get the best estimator
                 model = grid.best_estimator_
+                
+                # Store the trained model for SHAP analysis
+                models_dict[feature_set_name][nutrient] = model
+                # Get predictions on test set with the best estimator
                 preds = model.predict(Xte)
                 
-                # Filter test predictions for valid ground truth
-                test_valid_mask = ~np.isnan(y_te)
-                if not np.any(test_valid_mask):
-                    logger.warning(f"No valid test data for {nutrient}")
-                    continue
-                    
-                y_te_valid = y_te[test_valid_mask]
-                preds_valid = preds[test_valid_mask]
+                # Evaluate on test set (strict_df test samples)
+                metrics_result = _calculate_metrics(y_te_valid, preds, nutrient, feature_set_name, "strict", "test")
+                metrics_result["Model"] = model.__class__.__name__
+                #logger.info(f"Metrics for {feature_set_name} for {nutrient}: {metrics_result}")
+                results.append(metrics_result)
 
-                r2 = r2_manual(y_te_valid, preds_valid)
-                rmse = float(np.sqrt(mean_squared_error(y_te_valid, preds_valid)))
-                mae = float(mean_absolute_error(y_te_valid, preds_valid))
-                mape = float(mean_absolute_percentage_error(y_te_valid + 1e-6, preds_valid))
-                s = smape(y_te_valid, preds_valid)
+                # Get predictions on all samples with the best estimator
+                preds_all = model.predict(final_df[feature_cols].to_numpy(float))
+                final_df[f'{nutrient}_xgb_{feature_set_name}'] = preds_all
+                #logger.info(f"Added prediction column: {nutrient}_xgb_{feature_set_name}")
 
-                logger.info(f"{nutrient} - {feature_set_name}: R²={r2:.4f}, RMSE={rmse:.4f}, MAE={mae:.4f}, SMAPE={s:.4f}%")
-
-                results.append({
-                    "Nutrient": nutrient, 
-                    "FeatureSet": feature_set_name, 
-                    "Model": model.__class__.__name__,
-                    "R2": r2, "RMSE": rmse, "MAE": mae, "MAPE": mape, "SMAPE": s
-                })
-                
             except Exception as e:
                 logger.error(f"Error training {feature_set_name} for {nutrient}: {str(e)}")
                 continue
 
     result_df = pd.DataFrame(results)
-    logger.info(f"ML training complete. Generated {len(result_df)} results")
-    return result_df
+    first_3_cols = final_df.columns[:3].tolist()
+    pred_cols = [col for col in final_df.columns if col.startswith(f'{nutrient}_xgb_')]
+    
+    output_df = final_df[first_3_cols + pred_cols]
+    logger.info(f"ML training complete. Generated {len(result_df)} results (test set and remaining strict sample evaluations)")
+    
+    return result_df, models_dict, test_indices, output_df
+
