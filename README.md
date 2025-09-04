@@ -16,7 +16,7 @@ This repo provides a clean, reproducible pipeline with concise, side-by-side tru
 
 ```bash
 # Clone the repository
-git clone github.com/sarahjang15/nutpred
+git clone https://github.com/sarahjang15/nutpred.git
 
 # Install dependencies
 pip install -r nutpred/requirements.txt
