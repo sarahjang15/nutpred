@@ -6,7 +6,7 @@ Predict **Calcium (mg), Fiber (g), and Iron (mg)** from packaged food data using
 3) provided low-dim ingredient embeddings (`umap_10`), and  
 4) an optimization approach that infers ingredient ratios from an ingredient–nutrient table.
 
-This repo provides a clean, reproducible pipeline with manual metrics (including **R² = SSR/SST**) and side-by-side truth/pred outputs.
+This repo provides a clean, reproducible pipeline with concise, side-by-side truth/pred outputs and effective visualizations.
 
 ---
 
@@ -231,20 +231,3 @@ python run.py --outdir ./my_results
 
 ### Logs
 Check `nutpred.log` for detailed execution information and error messages.
-
----
-
-## Development
-
-For development and testing:
-```bash
-# Install in development mode
-pip install -e .
-
-# Run tests (if available)
-pytest tests/
-
-# Code formatting
-black nutpred/
-ruff check nutpred/
-```
