@@ -1,6 +1,6 @@
 # nutpred — Ingredient-Nutrient Prediction Toolkit
 
-Predict **Calcium (mg), Fiber (g), and Iron (mg)** from packaged snack data using:
+Predict **Calcium (mg), Fiber (g), and Iron (mg)** from packaged food data using:
 1) nutrient panels,  
 2) ingredient lists (binary & positional scores),  
 3) provided low-dim ingredient embeddings (`umap_10`), and  
@@ -16,22 +16,17 @@ This repo provides a clean, reproducible pipeline with manual metrics (including
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd nutrient-ratio-optimization
+git clone github.com/sarahjang15/nutpred
 
 # Install dependencies
 pip install -r nutpred/requirements.txt
-
-# Or install the package in development mode
-pip install -e .
-```
 
 ### 2. Prepare Data
 
 Place your data files in the `data/` directory:
 - `snack_input_df.csv` - Main snack dataset
 - `THESAURUSFORPUBLICRELEASE.XLSX` - Ingredient thesaurus
-- `ingnut_df_top135.csv` - Ingredient-nutrient reference table
+- `ingnut_df_top135.csv` - Nutrient information of ingredients (Snacks top 133 ingredients for testing)
 
 ### 3. Run the Pipeline
 
@@ -40,7 +35,7 @@ Place your data files in the `data/` directory:
 # Run with 100 samples for testing
 python run.py --test-size 100
 
-# Run with custom filter
+# Run with custom parameters
 python run.py --test-size 50 --filter-values popcorn pretzel
 ```
 
