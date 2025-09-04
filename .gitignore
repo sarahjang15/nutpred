@@ -7,7 +7,7 @@ nutpred_*.log
 run_nutpred_complete.py
 run_nutpred_test.py 
 # Output directories
-outputs/
+outputs*/
 test_outputs*/
 complete_outputs*/
 
