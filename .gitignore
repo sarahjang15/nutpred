@@ -5,11 +5,11 @@ nutpred_*.log
 
 # Previous versions
 run_nutpred_complete.py
-run_nutpred_test.py
+run_nutpred_test.py 
 # Output directories
 outputs/
-test_outputs/
-complete_outputs/
+test_outputs*/
+complete_outputs*/
 
 # Python
 __pycache__/
