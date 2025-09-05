@@ -31,7 +31,7 @@ Place your data files in the `data/` directory:
 ### 3. Run the Pipeline
 
 #### Test Mode (Quick Run)
-```bash
+```
 # Run with 100 samples for testing
 python run.py --test-size 100
 
@@ -40,7 +40,7 @@ python run.py --test-size 50 --filter-values popcorn pretzel
 ```
 
 #### Complete Mode (Full Dataset)
-```bash
+```
 # Run complete pipeline
 python run.py
 
@@ -49,7 +49,7 @@ python run.py --filter-type ingredients --filter-values popcorn pretzel pretzels
 ```
 
 #### Advanced Options
-```bash
+```
 # Full example with all options
 python run.py \
   --test-size 200 \
@@ -84,7 +84,7 @@ python run.py \
 | `--cv` | `3` | Cross-validation folds |
 | `--force-rf` | `False` | Use Random Forest instead of XGBoost |
 | `--opt-constraint` | `nnls_mono` | Optimization constraint type |
-| `--opt-solver` | `osqp` | Optimization solver |
+| `--opt-solver` | `osqp` | Optimization solver  |
 | `--opt-ridge` | `0.0` | Ridge regularization parameter |
 
 ---
