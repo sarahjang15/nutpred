@@ -6,10 +6,15 @@ nutpred_*.log
 # Previous versions
 run_nutpred_complete.py
 run_nutpred_test.py 
+
 # Output directories
 outputs*/
 test_outputs*/
 complete_outputs*/
+
+# .git
+.gitignore
+.gitattributes
 
 # Python
 __pycache__/
