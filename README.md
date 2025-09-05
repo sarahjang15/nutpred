@@ -83,8 +83,8 @@ python run.py \
 | `--outdir` | `./nutpred_outputs` | Output directory |
 | `--cv` | `3` | Cross-validation folds |
 | `--force-rf` | `False` | Use Random Forest instead of XGBoost |
-| `--opt-constraint` | `nnls_mono` | Optimization constraint type |
-| `--opt-solver` | `osqp` | Optimization solver  |
+| `--opt-constraint` | `nnls_mono` | Optimization constraint type (`nnls_only`, `nnls_mono`, `le1_mono`) |
+| `--opt-solver` | `osqp` | Optimization solver (`osqp`,  `clarabel`) |
 | `--opt-ridge` | `0.0` | Ridge regularization parameter |
 
 ---
