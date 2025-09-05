@@ -105,8 +105,8 @@ python run.py \
   - Row filtering (e.g., popcorn/pretzel) to prevent leakage.
   - Top-K ingredient universe → binary & positional score features.
   - Uses **provided** `umap_10`; no embedding training inside the pipeline.
-- **Clear, trustworthy metrics**
-  - **R² (SSR/SST)**, **RMSE**, **MAE**, **MAPE**, **SMAPE**.
+- **Clear, diverse metrics to compare models**
+  - **R² **, **RMSE**, **MAE**, **MAPE**, **SMAPE**.
 - **Tidy outputs**
   - Metrics CSV + heatmaps (R² / RMSE / SMAPE).
   - Processed dataset with **truth/pred pairs side-by-side**.
