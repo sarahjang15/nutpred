@@ -105,7 +105,8 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         logger.info(f"   Filtered data using {filter_type_str}: {filtered_df.shape}")
         
         values_str = "_".join(filter_values)
-        base_outdir = f"{'test' if is_test_mode else 'complete'}_outputs"
+
+        base_outdir = f"{args.outdir}_test" if is_test_mode else f"{args.outdir}_complete"
         
         outdir = base_outdir
         os.makedirs(outdir, exist_ok=True)
@@ -294,7 +295,7 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         
         # Add id and group columns
         for col in id_cols:
-            weights_df[col] = filtered_df.query("first_mapped")[[col]].values
+            weights_df[col] = filtered_df[filtered_df["first_mapped"]][col]
         
         # Reorder columns to put id columns at the beginning
         weights_df = weights_df[id_cols + [col for col in weights_df.columns if col not in id_cols]]
