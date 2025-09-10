@@ -1,0 +1,49 @@
+# Logs
+*.log
+logs/
+nutpred_*.log
+
+# Python notebooks
+*.ipynb
+
+# Previous versions
+run_nutpred_complete.py
+run_nutpred_test.py 
+
+# Output directories
+outputs*/
+test_outputs*/
+complete_outputs*/
+
+# .git
+.gitignore
+.gitattributes
+
+# nohup
+nohup.out
+
+# data
+data/branded_food.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
