@@ -35,11 +35,11 @@ This repo provides a clean, reproducible pipeline with concise, side-by-side tru
 
 1. **Test Mode (Quick Run)**
   ```bash
-  # Run with 100 samples for testing
+  # Run with 100 samples for testing (>100 recommended)
   python run.py --test-size 100
 
   # Run with custom parameters
-  python run.py --test-size 50 --filter-values popcorn pretzel
+  python run.py --test-size 100 --filter-values popcorn pretzel
   ```
 
 2. **Complete Mode (Full Dataset)**
