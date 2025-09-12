@@ -104,19 +104,20 @@ def create_scatterplots(pred_file_path: str = None, outdir: str = None):
     for nutrient in TARGET_NUT3:
         for pred_col in pred_cols:
             logger.info(f"Creating scatterplot for {nutrient} - {pred_col}")
-            data = food_df[food_df['SampleType'] == 'test'][[nutrient, pred_col]]            
             if "xgb" in pred_col:
                feature_set = pred_col.split('xgb_full_')[1]
+               data = food_df[food_df['SampleType'] == 'test'][[nutrient, pred_col]]       
                plt.figure(figsize=(10, 8))                   
-               sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5)
+               sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5, hue=data['mapped_ratio_high'])
                plt.title(f'Scatterplot: {nutrient} - xgb - full - {feature_set}')
                plt.xlabel('True')
                plt.ylabel('Predicted')
                plt.axline((0, 0), (1, 1), color='black', linestyle='--')
                plt.savefig(os.path.join(plots_dir, f'scatterplot_{nutrient}_xgb_full_{feature_set}.png'))
             elif "opt" in pred_col:
+                data = food_df[[nutrient, pred_col]]       
                 plt.figure(figsize=(10, 8))
-                sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5)
+                sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5, hue=data['mapped_ratio_high'])
                 plt.title(f'Scatterplot: {nutrient} - opt - full')
                 plt.xlabel('True')
                 plt.ylabel('Predicted')
