@@ -10,9 +10,6 @@ from sklearn.preprocessing import MultiLabelBinarizer
 logger = logging.getLogger(__name__)
 
 
-# -----------------------------
-# Public API
-# -----------------------------
 def load_inputs(food_df_csv: str, thesaurus_xlsx: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Load food_df CSV and thesaurus XLSX."""
     food_df = pd.read_csv(food_df_csv)
@@ -24,6 +21,85 @@ def make_id_col(food_df: pd.DataFrame) -> pd.DataFrame:
     food_df = food_df.copy()
     food_df['id_col'] = food_df.index.astype(str)
     return food_df
+
+def filter_valid_nutrition_data(df):
+    """
+    Filter out rows with invalid nutrition data based on validation rules.
+    
+    Returns:
+        DataFrame: Filtered DataFrame with only valid rows
+    """
+    valid_indices = []
+    
+    for idx, row in df.iterrows():
+        is_valid = True
+        
+        # 1) 에너지가 > 1,080 kcal 초과인 경우
+        if pd.notna(row["Energy(kcal)"]) and row["Energy(kcal)"] >= 0:
+            if row["Energy(kcal)"] > 1080:
+                is_valid = False
+                continue
+        
+        # 2) 에너지가 (탄수화물, 단백질, 지방으로 산출한 에너지) 20% 초과인 경우
+        if ((pd.notna(row["Energy(kcal)"]) and row["Energy(kcal)"] >= 0) and 
+            (pd.notna(row["Carbohydrate(g)"]) and row["Carbohydrate(g)"] >= 0) and
+            (pd.notna(row["Protein(g)"]) and row["Protein(g)"] >= 0) and
+            (pd.notna(row["Total fat(g)"]) and row["Total fat(g)"] >= 0)):
+            calculated_energy = (
+                (row["Carbohydrate(g)"] if pd.notna(row["Carbohydrate(g)"]) else 0) * 4 +
+                (row["Total fat(g)"] if pd.notna(row["Total fat(g)"]) else 0) * 9 +
+                (row["Protein(g)"] if pd.notna(row["Protein(g)"]) else 0) * 4
+            )
+            lower_bound = calculated_energy * 0.8
+            upper_bound = calculated_energy * 1.2
+            if not (lower_bound <= row["Energy(kcal)"] <= upper_bound):
+                is_valid = False
+                continue
+        
+        # 3) 지방, 포화지방, 트랜스지방 이상치 검토
+        # 3-1) 포화지방산 > 지방 인 경우
+        if (pd.notna(row["Total fat(g)"]) and row["Total fat(g)"] >= 0) and (pd.notna(row["Saturated fatty acids(g)"]) and row["Saturated fatty acids(g)"] >= 0):
+            if row["Total fat(g)"] < row["Saturated fatty acids(g)"]:
+                is_valid = False
+                continue
+        
+        # 3-2) 트랜스지방산 > 지방 인 경우
+        if (pd.notna(row["Total fat(g)"]) and row["Total fat(g)"] >= 0) and (pd.notna(row["Trans fatty acids(g)"]) and row["Trans fatty acids(g)"] >= 0):
+            if row["Total fat(g)"] < row["Trans fatty acids(g)"]:
+                is_valid = False
+                continue
+        
+        # 3-3) '지방' < ('포화지방산'+'트랜스지방산'+'콜레스테롤/1000') 인 경우
+        if pd.notna(row["Total fat(g)"]) and row["Total fat(g)"] >= 0:
+            trans_fat = row["Trans fatty acids(g)"] if pd.notna(row["Trans fatty acids(g)"]) else 0
+            sat_fat = row["Saturated fatty acids(g)"] if pd.notna(row["Saturated fatty acids(g)"]) else 0
+            cholesterol = row["Cholesterol(mg)"] / 1000 if pd.notna(row["Cholesterol(mg)"]) else 0
+            
+            total_fat = trans_fat + sat_fat + cholesterol
+            
+            if total_fat > row["Total fat(g)"]:
+                is_valid = False
+                continue
+        
+        # 4) 탄수화물, 지방, 단백질 이상치 검토: ('100g 당 탄수화물'+ '100g당 단백질'+ '100g당 지방') ≤ 100
+        total_macros = sum([
+            row["Carbohydrate(g)"] if pd.notna(row["Carbohydrate(g)"]) else 0,
+            row["Total fat(g)"] if pd.notna(row["Total fat(g)"]) else 0,
+            row["Protein(g)"] if pd.notna(row["Protein(g)"]) else 0
+        ])
+        
+        if total_macros >= 100.0001:
+            is_valid = False
+            continue
+        
+        if is_valid:
+            valid_indices.append(idx)
+        
+    df = df.loc[valid_indices]
+    df = df[['fdc_id', 'branded_food_category', 'brand_owner', 'market_country', 'description', 'ingredients', 'Energy(kcal)', 'Protein(g)', 'Total fat(g)', 'Carbohydrate(g)', 'Total sugar(g)', 'Saturated fatty acids(g)', 'Cholesterol(mg)', 'Sodium(mg)', 'Fiber(g)', 'Calcium(mg)', 'Iron(mg)']]
+    df.reset_index(drop=True, inplace=True).dropna(inplace=True)
+    return df
+
 
 def ensure_mapped_list_column(
     food_df: pd.DataFrame,
@@ -237,7 +313,6 @@ def is_first_mapped(row):
     # The first_mapped is TRUE if the first mapped ingredient is present in the top-k list
     # This means it was successfully mapped and survived the top-k filtering
     return first_mapped_ing in mapped_topk_list
-    
 
 
 def build_binary_and_scores(food_df: pd.DataFrame, top_list: List[str], max_score: int = 20) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -404,4 +479,5 @@ __all__ = [
     "ensure_targets",
     "calculate_mapped_ratio",
     "calculate_mapped_ratio_top20",
+    "filter_valid_nutrition_data",
 ]
