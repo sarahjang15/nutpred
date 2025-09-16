@@ -10,6 +10,7 @@ import traceback
 import pandas as pd
 import numpy as np
 import argparse
+import warnings
 from sklearn.model_selection import train_test_split
 import yaml
 from datetime import datetime
@@ -31,6 +32,8 @@ logger = logging.getLogger(__name__)
 # Add the current directory to Python path
 sys.path.insert(0, os.path.abspath('.'))
 
+#warnings.filterwarnings("ignore")
+
 def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", filter_values=["popcorn", "pretzel", "pretzels"]):
    
     """Run the nutpred pipeline with optional test mode"""
@@ -51,7 +54,8 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
             'nutpred.pred_by_ingnut', 
             'nutpred.pred_by_fullnut',
             'nutpred.metrics',
-            'nutpred.viz'
+            'nutpred.viz',
+            'nutpred.constants'
         ]
         
         for module_name in modules_to_reload:
@@ -65,11 +69,12 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         from nutpred.preprocess import (
             load_inputs, make_id_col, ensure_mapped_list_column, filter_rows, filter_by_category, filter_by_ingredients, extract_topk_from_ingnut,
             filter_ingredients_to_topk, is_first_mapped, calculate_mapped_ratio, calculate_mapped_ratio_top20,
-            preprocess_pipeline, ensure_umap_columns, select_base_nutrients, ensure_targets
+            preprocess_pipeline, ensure_umap_columns, ensure_base_nutrients, ensure_targets
         )
         from nutpred.pred_by_ingnut import predict_ingnut_weights_and_targets, eval_ing_pred
         from nutpred.pred_by_fullnut import train_tree_models
         from nutpred.viz import compare_feature_sets, create_scatterplots, create_shap_plots
+        import nutpred.constants as C
         
         logger.info("Module reload complete - using latest versions")
 
@@ -87,6 +92,14 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         # Make id column
         food_df = make_id_col(food_df)
         logger.info("   Created id column")
+
+        # Ensure base nutrients
+        ensure_base_nutrients(food_df)
+        logger.info("   Ensured base nutrients")
+        
+        # Ensure targets
+        ensure_targets(food_df)
+        logger.info("   Ensured targets")
         
         # Create ingredient mapping first (needed for filtering)
         food_df = ensure_mapped_list_column(food_df, thesaurus_df)
@@ -101,12 +114,12 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
             # Use ingredient-based filtering (exclude rows with these ingredients)
             filtered_df = filter_rows(food_df, exclude_terms=filter_values)
             filter_type_str = "ingredients"
-        
+            
         logger.info(f"   Filtered data using {filter_type_str}: {filtered_df.shape}")
         
         values_str = "_".join(filter_values)
 
-        base_outdir = f"{args.outdir}_test" if is_test_mode else f"{args.outdir}_complete"
+        base_outdir = f"test_{args.outdir}" if is_test_mode else f"complete_{args.outdir}"
         
         outdir = base_outdir
         os.makedirs(outdir, exist_ok=True)
@@ -147,14 +160,12 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         
         # Select columns
         logger.info("   Selecting base nutrients and target nutrients")
-        nut8_cols = select_base_nutrients(filtered_df)
-        targets = ensure_targets(filtered_df)
         umap_cols = [c for c in filtered_df.columns if c.startswith("umap_10_")]
         binary_cols = [c for c in filtered_df.columns if c.startswith("binary_")]
         score_cols = [c for c in filtered_df.columns if c.startswith("score_")]
         
-        logger.info(f"   Base nutrients: {len(nut8_cols)}")
-        logger.info(f"   Target nutrients: {len(targets)}")
+        logger.info(f"   Base nutrients: {len(C.NUT8)}")
+        logger.info(f"   Target nutrients: {len(C.TARGET_NUT3)}")
         logger.info(f"   UMAP features: {len(umap_cols)}")
         logger.info(f"   Binary features: {len(binary_cols)}")
         logger.info(f"   Score features: {len(score_cols)}")
@@ -184,18 +195,19 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         ingnut_cols = ['Energy', 'Total lipid (fat)', 'Protein', 'Carbohydrate, by difference', 
                       'Sugars, total', 'Sodium, Na', 'Cholesterol', 'Fatty acids, total saturated']
         
-        logger.info(f"   Available nut8 columns: {nut8_cols}")
+        logger.info(f"   Available nut8 columns: {C.NUT8}")
         logger.info(f"   Available ingnut columns: {ingnut_cols}")
         
         # Create mapping between snack and ingnut column names
         column_mapping = {}
-        for food_col, ingnut_col in zip(nut8_cols, ingnut_cols):
+        for food_col, ingnut_col in zip(C.NUT8, ingnut_cols):
             column_mapping[food_col] = ingnut_col
         
         logger.info(f"   Column mapping: {column_mapping}")
         
         # Create train/test split for evaluation (not for optimization training)
-        train_idx, test_idx = train_test_split(range(len(filtered_df)), test_size=0.2, random_state=random_state)
+        filtered_df.reset_index(drop=True, inplace=True)
+        train_idx, test_idx = train_test_split(filtered_df.index, test_size=0.2, random_state=random_state)
         logger.info(f"   Created train/test split: {len(train_idx)} train samples, {len(test_idx)} test samples")
         
         filtered_df["SampleType"] = "train"
@@ -205,9 +217,9 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         group_cols = ["first_mapped", "mapped_ratio_high", "mapped_ratio_top20_high", "strict"]
         group_dfs = {}
         for group_col in group_cols:
-            group_dfs[group_col] = filtered_df[filtered_df[group_col]].copy()
+            group_dfs[group_col] = filtered_df[filtered_df[group_col]].reset_index(drop=True).copy()
             logger.info(f"   Created group dataframe for {group_col}: {group_dfs[group_col].shape}")
-        group_dfs["full"] = filtered_df
+        group_dfs["full"] = filtered_df.copy()
         group_cols.append("full")
         logger.info(f"   Full dataframe size is: {group_dfs['full'].shape}")
 
@@ -221,7 +233,7 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         opt_preds_w = {}
         for group_name, group_df in group_dfs.items():
             group_df, preds_w, failed_indices = predict_ingnut_weights_and_targets(
-                group_df, ingnut_df, nut8_cols, ingnut_cols, 
+                group_df, ingnut_df, C.NUT8, ingnut_cols, 
             constraint=args.opt_constraint, ridge=args.opt_ridge, robust=args.opt_robust, 
             solver_name=args.opt_solver, scale=args.opt_scale, top_list=top_list, group_name=group_name
             )
@@ -240,30 +252,30 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         optimization_metrics = {}
         logger.info("Calculating optimization metrics...")
         for group_name, group_df in group_dfs.items():
-            optimization_metrics[group_name] = eval_ing_pred(group_df, nut8_cols=nut8_cols, group_name=group_name)
+            optimization_metrics[group_name] = eval_ing_pred(group_df, group_name=group_name)
             logger.info(f"  {group_name} optimization metrics calculated.")
         logger.info(f"Optimization metrics calculation complete for all groups.")
         
         # Step 3: Train and evaluate ML prediction models 
         logger.info("Step 3: Training and evaluating ML prediction models")
         feature_sets = {
-            "nut8": nut8_cols,
-            "nut8+binary": nut8_cols + binary_cols,
-            "nut8+score": nut8_cols + score_cols,
-            "nut8+umap_10": nut8_cols + umap_cols,
+            "nut8": C.NUT8,
+            "nut8+binary": C.NUT8 + binary_cols,
+            "nut8+score": C.NUT8 + score_cols,
+            "nut8+umap_10": C.NUT8 + umap_cols,
         }
         
         ml_metrics = {}
         ml_output_dfs = {}
         models_dicts = {}
         for group_name, group_df in group_dfs.items():
-            ml_metrics[group_name], models_dicts[group_name], ml_output_dfs[group_name] = train_tree_models(group_df, feature_sets, targets, test_idx, cv=3, group_name=group_name)
+            ml_metrics[group_name], models_dicts[group_name], ml_output_dfs[group_name] = train_tree_models(group_df, feature_sets, C.TARGET_NUT3, cv=args.cv, group_name=group_name, outdir=outdir)
 
         # Step 4: Save outputs
         logger.info("Step 4: Saving outputs")
         
         # Get id columns
-        id_cols = ['id_col'] + filtered_df.columns[:3].tolist()
+        id_cols = ['id_col', 'SampleType'] + filtered_df.columns[:3].tolist() 
       
         # (1) Ingredient parsing summary
         logger.info("   (1) Saving ingredient parsing summary...")
@@ -299,7 +311,7 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         
         # Reorder columns to put id columns at the beginning
         weights_df = weights_df[id_cols + [col for col in weights_df.columns if col not in id_cols]]
-        weights_filename = f"ingredient_weights_{'test' if is_test_mode else ''}_full.csv"
+        weights_filename = f"ingredient_weights_{'test' if is_test_mode else 'complete'}.csv"
         weights_df.to_csv(os.path.join(outdir, weights_filename), index=False)
         logger.info(f"   Saved {weights_filename}")
         
@@ -313,7 +325,7 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
             if len(metrics) ==  0:
                 continue
             all_metrics = pd.concat([all_metrics, metrics], ignore_index=True)
-        metrics_filename = f"metrics_{'test' if is_test_mode else 'all_models'}.csv"
+        metrics_filename = f"metrics_{'test' if is_test_mode else 'complete'}.csv"
         all_metrics.to_csv(os.path.join(outdir, metrics_filename), index=False)
         logger.info(f"   Saved {metrics_filename}")
         
@@ -323,13 +335,9 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         
         # Save sample info
         df_with_preds = filtered_df[id_cols + [col for col in group_cols if col != "full"]].copy()
-        df_with_preds['SampleType'] = 'train'
-        # Filter test_idx to only include indices that exist in df_with_preds
-        valid_test_idx = [idx for idx in test_idx if idx in df_with_preds.index]
-        if valid_test_idx:
-            df_with_preds.loc[valid_test_idx, 'SampleType'] = 'test'
       
-        for nutrient in nut8_cols:
+       # Add base nutrients
+        for nutrient in C.NUT8:
             df_with_preds[nutrient] = filtered_df[nutrient].copy()
         
         # Add optimization predictions
@@ -339,24 +347,24 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
     
         # Add ML predictions
         for group_name, ml_output_df in ml_output_dfs.items():
-
             ml_pred_cols = [col for col in ml_output_df.columns if '_xgb_' in col]
             df_with_preds = df_with_preds.merge(ml_output_df[id_cols + ml_pred_cols], on=id_cols, how='left')
 
         # Reorder columns for easy comparison
         ordered_cols = id_cols + [col for col in group_cols if col != "full"] 
-        ordered_cols += ['SampleType']
-        for nutrient in nut8_cols + targets:
+        logger.info(f"DEBUGGING - CHECK nut8 columns: {C.NUT8}")
+        logger.info(f"DEBUGGING - CHECK target nutrient columns: {C.TARGET_NUT3}")
+        for nutrient in C.TARGET_NUT3:
+            ordered_cols += [col for col in df_with_preds.columns if nutrient in col] 
+        for nutrient in C.NUT8:
             ordered_cols += [col for col in df_with_preds.columns if nutrient in col] 
 
         df_with_preds = df_with_preds[ordered_cols]
 
         # Save predictions
-        df_with_preds_filename = f"df_with_preds_{'test' if is_test_mode else 'all_models'}.csv"
+        df_with_preds_filename = f"df_with_preds_{'test' if is_test_mode else 'complete'}.csv"
         df_with_preds.to_csv(os.path.join(outdir, df_with_preds_filename), index=False)
         logger.info(f"   Saved {df_with_preds_filename}")
-
-        #raise ValueError("Stop here for now")
     
         # Step 6: Create visualizations
         logger.info("   (6) Creating visualizations...")
@@ -411,12 +419,12 @@ PROCESSING RESULTS:
 - {len(binary_cols)} binary features created
 - {len(score_cols)} score features created  
 - {len(umap_cols)} UMAP features used
-- {len(nut8_cols)} base nutrients predicted
-- {len(targets)} target nutrients predicted
+- {len(C.NUT8)} base nutrients predicted
+- {len(C.TARGET_NUT3)} target nutrients predicted
 
 MODEL PERFORMANCE:
 - Optimization solver: OSQP with nnls_mono constraint
-- ML models trained: {len(all_metrics) // (len(targets) * 2) if len(all_metrics) > 0 else 0} different feature combinations (evaluated on strict and all samples)
+- ML models trained: {len(all_metrics) // (len(C.TARGET_NUT3) * 2) if len(all_metrics) > 0 else 0} different feature combinations (evaluated on strict and all samples)
 - Total model evaluations: {len(all_metrics)} (including cross-validation and filter breakdowns)
 
 OUTPUT FILES GENERATED:
@@ -426,7 +434,7 @@ OUTPUT FILES GENERATED:
 4. {weights_filename} - Optimization weights for each sample
 
 5. plots/ - Directory containing comprehensive visualizations:
-   - metrics_comparison_heatmap.png - Model performance comparison heatmap
+   - metrics_comparison_[nutrient].png - Model performance comparison heatmap for each nutrient
    - scatterplots/ - True vs predicted scatterplots for all feature sets and groups
    - shap/ - SHAP analysis plots for XGBoost models (if available)
 6. nutpred.log - Detailed execution log
@@ -470,7 +478,7 @@ if __name__ == "__main__":
     ap.add_argument("--filter-type", choices=["ingredients", "category"], default="ingredients",
                        help="Type of filtering: 'ingredients' (default) or 'category'")
     ap.add_argument("--filter-values", nargs='+', 
-                       default=["popcorn", "pretzel", "pretzels"], 
+                       default="", 
                        help="Values to filter by (ingredient keywords or category names)")
 
     # File paths

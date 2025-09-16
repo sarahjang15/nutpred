@@ -6,6 +6,7 @@ from collections import Counter
 from nutpred.cleaning import clean_ingredient_text
 import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer 
+import nutpred.constants as C
 
 logger = logging.getLogger(__name__)
 
@@ -378,22 +379,15 @@ def ensure_umap_columns(food_df: pd.DataFrame, expected_dim: int = 10) -> pd.Dat
             food_df[f"umap_10_{i+1}"] = [a[i] for a in arrs]
     return food_df
 
-def select_base_nutrients(food_df: pd.DataFrame) -> List[str]:
-    cols = [
-        "Energy(kcal)", "Carbohydrate(g)", "Total fat(g)", "Protein(g)",
-        "Sodium(mg)", "Total sugar(g)", "Saturated fatty acids(g)", "Cholesterol(mg)",
-    ]
-    missing = [c for c in cols if c not in food_df.columns]
+def ensure_base_nutrients(food_df: pd.DataFrame) -> List[str]:
+    missing = [c for c in C.NUT8 if c not in food_df.columns]
     if missing:
         raise ValueError(f"Missing base nutrient columns: {missing}")
-    return cols
 
 def ensure_targets(food_df: pd.DataFrame) -> List[str]:
-    targets = ["Calcium(mg)", "Fiber(g)", "Iron(mg)"]
-    missing = [c for c in targets if c not in food_df.columns]
+    missing = [c for c in C.TARGET_NUT3 if c not in food_df.columns]
     if missing:
         raise ValueError(f"Missing target columns: {missing}")
-    return targets
 
  # Calculate mapped ratio
 def calculate_mapped_ratio(row):
@@ -441,7 +435,7 @@ def preprocess_pipeline(food_df: pd.DataFrame, ingnut_df: pd.DataFrame, k: int =
     4. Join features to food_df dataframe
     """
     logger.info("Preprocessing ingredients...")
-    
+
     # Step 1: Extract top-k ingredients from ingnut_df
     ingnut_df, top_list = extract_topk_from_ingnut(ingnut_df, k=k)
     
@@ -475,7 +469,7 @@ __all__ = [
     "process_ingredients",
     "build_binary_and_scores",
     "ensure_umap_columns",
-    "select_base_nutrients",
+    "ensure_base_nutrients",
     "ensure_targets",
     "calculate_mapped_ratio",
     "calculate_mapped_ratio_top20",

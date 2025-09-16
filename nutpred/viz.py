@@ -6,15 +6,9 @@ import logging
 from nutpred.preprocess import is_first_mapped
 from sklearn.metrics import r2_score, mean_squared_error
 import seaborn as sns
+import nutpred.constants as C
 
 logger = logging.getLogger(__name__)
-
-
-# Define target nutrients
-TARGET_NUT3 = ['Calcium(mg)', 'Fiber(g)', 'Iron(mg)']
-ORDER = ["nut8", "nut8+binary", "nut8+score", "nut8+umap_10", "ing_pred"]
-GROUP_COLS = ["full", "first_mapped", "mapped_ratio_high", "mapped_ratio_top20_high", "strict"]
-    
 
 def compare_feature_sets(metrics_df: pd.DataFrame = None, metrics_file_path: str = None, outdir: str = None):
     """Create a single heatmap showing model types (rows) × metrics (columns)."""
@@ -42,7 +36,7 @@ def compare_feature_sets(metrics_df: pd.DataFrame = None, metrics_file_path: str
     metrics_to_plot = ['R2', 'RMSE', 'SMAPE']
     
     # Create separate heatmaps for each nutrient: ModelType (rows) × Group (columns)
-    for nutrient in TARGET_NUT3:
+    for nutrient in C.TARGET_NUT3:
         n_metrics = len(metrics_to_plot)
         fig, axes = plt.subplots(1, n_metrics, figsize=(6*n_metrics, 6))
         if n_metrics == 1:
@@ -64,7 +58,7 @@ def compare_feature_sets(metrics_df: pd.DataFrame = None, metrics_file_path: str
             # Reorder rows to put optimization first, then feature sets
             model_order = [col for col in pivot.index]
             pivot = pivot.reindex(model_order)
-            pivot = pivot[GROUP_COLS]
+            pivot = pivot[C.GROUP_COLS]
             
             # Create heatmap
             sns.heatmap(pivot, annot=True, fmt='.3f', cmap='Blues', 
@@ -96,12 +90,12 @@ def create_scatterplots(pred_file_path: str = None, outdir: str = None):
     # Get all prediction columns
     food_df = pd.read_csv(pred_file_path)
     pred_cols =  []
-    for nutrient in TARGET_NUT3:
+    for nutrient in C.TARGET_NUT3:
         pred_cols.extend([col for col in food_df.columns if f'{nutrient}_' in col])
     pred_cols = [x for x in pred_cols if 'full' in x and x[-2] != "."]
 
     # Create scatterplots for each nutrient, model type, and group
-    for nutrient in TARGET_NUT3:
+    for nutrient in C.TARGET_NUT3:
         for pred_col in pred_cols:
             logger.info(f"Creating scatterplot for {nutrient} - {pred_col}")
             if "xgb" in pred_col:
@@ -143,7 +137,7 @@ def create_shap_plots(food_df: pd.DataFrame, models_dict: dict, feature_sets: di
         return
     
     # Create SHAP plots for each model
-    for nutrient in TARGET_NUT3:
+    for nutrient in C.TARGET_NUT3:
         logger.info(f"Creating SHAP plots for {nutrient}")     
         for feature_set_name, feature_cols in feature_sets.items():
             for group_name, model_dict in models_dict.items():

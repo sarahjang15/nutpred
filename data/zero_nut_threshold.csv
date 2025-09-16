@@ -1,0 +1,14 @@
+nutrient,zero_threshold_full,zero_threshold_value,zero_threshold_unit
+Energy(kcal),<5kcal,5.0,kcal
+Carbohydrate(g),<0.5g,0.5,g
+Total sugar(g),<0.5g,0.5,g
+Protein(g),<0.5g,0.5,g
+Total fat(g),<0.5g,0.5,g
+Saturated fatty acids(g),<0.5g,0.5,g
+Trans fatty acids(g),<0.5g,0.5,g
+Cholesterol(mg),<2mg,2.0,mg
+Fiber(g),<0.5g,0.5,g
+Sodium(mg),<5mg,5.0,mg
+Potassium(mg),<5mg,5.0,mg
+Calcium(mg),<26mg,26.0,mg
+Iron(mg),<0.36mg,0.36,mg

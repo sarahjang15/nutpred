@@ -1,3 +1,4 @@
+from locale import D_FMT
 import numpy as np
 import pandas as pd
 import logging
@@ -75,10 +76,9 @@ def _calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray, nutrient: str, fe
     }
 
 def train_tree_models(
-    df: pd.DataFrame,  
+    food_df: pd.DataFrame,  
     feature_sets: dict,
     targets: List[str],
-    test_indices: List[int],
     random_state: int = 42,
     cv: int = 3,
     group_name: str = None,
@@ -88,33 +88,26 @@ def train_tree_models(
     """
     Train ML models and evaluate on test set + add predictions of all samples.
     """
-    # Apply failed filter to get final strict samples for ML
-    #success_mask = (df["failed"] == False)
-    #success_indices = df[success_mask].index.tolist()
-   
-    #final_df = df[success_mask]
-    final_df = df
-    logger.info(f"   Samples used for ML training:: {len(final_df)}")
+    logger.info(f"Samples used for ML training: {len(food_df)}")
 
-    test_indices = final_df[final_df.index.isin(test_indices)].index.tolist()
-    train_indices = ~np.isin(final_df.index, test_indices)
-    #logger.info(f"   Test indices after filtering out failed samples: {len(test_indices)}")
+    test_indices = food_df[food_df.SampleType == 'test'].index.tolist()
+    train_indices = food_df[food_df.SampleType == 'train'].index.tolist()
 
     logger.info(f"Starting ML training with {len(targets)} targets and {len(feature_sets)} feature sets")
     logger.info(f"Parameters: test_size={len(test_indices)}, cv={cv}, force_rf={force_rf}")
     
     
     # Check if we have enough samples for train/test split
-    if len(final_df) < 10:
-        logger.error(f"Not enough samples for ML training: {len(final_df)} samples")
-        raise ValueError(f"Not enough samples for ML training: {len(final_df)} samples. Need at least 10 samples.")
+    if len(food_df) < 10:
+        logger.error(f"Not enough samples for ML training: {len(food_df)} samples")
+        raise ValueError(f"Not enough samples for ML training: {len(food_df)} samples. Need at least 10 samples.")
 
     results = []
     models_dict = {}  # Store trained models for SHAP analysis
     
     for nutrient in targets:
         logger.info(f"Training models for nutrient: {nutrient}")
-        y = final_df[nutrient]
+        y = food_df[nutrient]
         y_tr, y_te = y[train_indices].to_numpy(float), y[test_indices].to_numpy(float)
         
         logger.info(f"Valid training samples for {nutrient}: {len(y_tr)}")
@@ -126,13 +119,13 @@ def train_tree_models(
             logger.info(f"Training ML model with {feature_set_name} features for {nutrient}")
             
             # Check if all feature columns exist
-            missing_cols = [col for col in feature_cols if col not in df.columns]
+            missing_cols = [col for col in feature_cols if col not in food_df.columns]
             if missing_cols:
                 logger.warning(f"Missing columns for {feature_set_name}: {missing_cols}")
                 continue
             
-            Xtr = final_df.loc[train_indices, feature_cols].to_numpy(float)
-            Xte = final_df.loc[test_indices, feature_cols].to_numpy(float)
+            Xtr = food_df.loc[train_indices, feature_cols].to_numpy(float)
+            Xte = food_df.loc[test_indices, feature_cols].to_numpy(float)
             
             # Handle NaN values consistently
             Xtr = _handle_nan_features(Xtr, feature_set_name)
@@ -149,8 +142,8 @@ def train_tree_models(
                 # Get the best estimator
                 model = grid.best_estimator_
                 # save best estimator to config.yaml
-                with open(os.path.join(outdir, "config.yaml"), "a") as f:
-                    f.write(f"{feature_set_name}_{nutrient}: {model}\n")
+                #with open(os.path.join(outdir, "config.yaml"), "a") as f:
+                #    f.write(f"{feature_set_name}_{nutrient}: {model}\n")
 
                 #logger.info(f"Best estimator: {model}")
                 
@@ -170,9 +163,9 @@ def train_tree_models(
                 results.append(metrics_result)
 
                 # Get predictions on all samples with the best estimator
-                preds_all = model.predict(final_df[feature_cols].to_numpy(float))
+                preds_all = model.predict(food_df[feature_cols].to_numpy(float))
                 preds_all = np.maximum(preds_all, 0) # if below 0, cut to 0
-                final_df[f'{nutrient}_xgb_{group_name}_{feature_set_name}'] = preds_all
+                food_df[f'{nutrient}_xgb_{group_name}_{feature_set_name}'] = preds_all
                 logger.info(f"Added prediction column: {nutrient}_xgb_{group_name}_{feature_set_name}")
 
             except Exception as e:
@@ -180,10 +173,10 @@ def train_tree_models(
                 continue
 
     result_df = pd.DataFrame(results)
-    id_cols = ["id_col"] + final_df.columns[:3].tolist()
-    pred_cols = [col for col in final_df.columns if '_xgb_' in col]
+    id_cols = ["id_col", "SampleType"] + food_df.columns[:3].tolist()
+    pred_cols = [col for col in food_df.columns if '_xgb_' in col]
     
-    output_df = final_df[id_cols + pred_cols]
+    output_df = food_df[id_cols + pred_cols]
     logger.info(f"ML training complete. Generated {len(result_df)} results (test set and remaining strict sample evaluations)")
     
     return result_df, models_dict, output_df

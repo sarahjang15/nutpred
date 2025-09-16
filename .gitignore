@@ -14,16 +14,22 @@ run_nutpred_test.py
 outputs*/
 test_outputs*/
 complete_outputs*/
+complete_*/
+test_*/
+nutpred_outputs*/
+
 
 # .git
 .gitignore
 .gitattributes
+.git-rewrite
 
 # nohup
 nohup.out
 
 # data
 data/branded_food.csv
+data/snack_change_to_zero.csv
 
 # Python
 __pycache__/

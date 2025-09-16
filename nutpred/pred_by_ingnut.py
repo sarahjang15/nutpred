@@ -6,9 +6,10 @@ from numpy.linalg import norm
 from typing import List, Dict, Tuple, Optional
 import logging
 import traceback
-from .metrics import r2_manual, smape
-from .preprocess import is_first_mapped
+from nutpred.metrics import r2_manual, smape
+from nutpred.preprocess import is_first_mapped
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, mean_absolute_percentage_error
+import nutpred.constants as C
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,7 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
     logger.info("Starting optimization for each sample...")
     
     for j, Sj in enumerate(mapped_tokens):
-        if j % 50 == 0:  # Progress update every 50 samples
+        if j % 100 == 0:  # Progress update every 100 samples
             logger.info(f"Optimization progress: {j}/{n_snack} samples completed, {len(failed)} failed")
             
         if not Sj:
@@ -279,21 +280,16 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
 # ---------------------------------------------------------------------
 # Evaluate ing_pred
 # ---------------------------------------------------------------------
-def eval_ing_pred(df: pd.DataFrame, nut8_cols: list = None, group_name: str = None) -> pd.DataFrame:
+def eval_ing_pred(df: pd.DataFrame, group_name: str = None) -> pd.DataFrame:
     """Metrics for ing_pred method (direct predictions from optimizer)."""
     logger.info("Calculating metrics for ingredient prediction method")
     
-    # Define all nutrients to evaluate (nut8 + targets)
-    all_nutrients = nut8_cols or []
-    target_nutrients = ['Calcium(mg)', 'Fiber(g)', 'Iron(mg)']
-    all_nutrients.extend(target_nutrients)
-    
-    logger.info(f"Evaluating metrics for all nutrients: {all_nutrients}")
+    logger.info(f"Evaluating metrics for all nutrients: {C.NUT11}")
     
     rows = []
     
     # Evaluate only the nutrients that have predictions
-    for nutrient in all_nutrients:
+    for nutrient in C.NUT11:
         pred_col = f"{nutrient}_opt_{group_name}"
         if nutrient in df.columns and pred_col in df.columns:
             y = df[nutrient].to_numpy(float)
