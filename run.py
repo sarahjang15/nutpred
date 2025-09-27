@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.abspath('.'))
 
 #warnings.filterwarnings("ignore")
 
-def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", filter_values=["popcorn", "pretzel", "pretzels"]):
+def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", filter_values=None):
    
     """Run the nutpred pipeline with optional test mode"""
     try:
@@ -175,11 +175,19 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         logger.info(f"   Loaded ingnut data: {ingnut_df.shape}")
         
         # Get the top-k list used for feature engineering
-        ingnut_df, top_list = extract_topk_from_ingnut(ingnut_df, k=133)
+        ingnut_df, top_list = extract_topk_from_ingnut(ingnut_df)
         logger.info(f"   Using top-{len(top_list)} ingredients for optimization")
+        # Concise alignment check and quick Calcium recompute example (first row if possible)
+        try:
+            ing_upper = ingnut_df["ing"].astype(str).str.upper().tolist()
+            aligned = (top_list == ing_upper)
+            logger.info(f"Alignment check (top_list vs ingnut rows): {aligned}")
+            logger.info(f"Example (first 5): top_list={top_list[:5]} vs ingnut={ing_upper[:5]}")
+        except Exception as _e:
+            logger.warning(f"Alignment check failed: {_e}")
         
         # Preprocess food df and create features
-        filtered_df = preprocess_pipeline(filtered_df, ingnut_df, k=133)
+        filtered_df = preprocess_pipeline(filtered_df, ingnut_df)
         logger.info(f"   Processed ingredients: {filtered_df.shape}")
         
         # Get feature columns
@@ -216,12 +224,18 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         # Make df for each filter group
         group_cols = ["first_mapped", "mapped_ratio_high", "mapped_ratio_top20_high", "strict"]
         group_dfs = {}
-        for group_col in group_cols:
-            group_dfs[group_col] = filtered_df[filtered_df[group_col]].reset_index(drop=True).copy()
-            logger.info(f"   Created group dataframe for {group_col}: {group_dfs[group_col].shape}")
-        group_dfs["full"] = filtered_df.copy()
-        group_cols.append("full")
-        logger.info(f"   Full dataframe size is: {group_dfs['full'].shape}")
+        if args.groups == "full":
+            group_dfs["full"] = filtered_df.copy()
+            group_cols = ["full"]
+            logger.info(f"   Running ONLY the 'full' group: {group_dfs['full'].shape}")
+        else:
+            group_cols = ["first_mapped", "mapped_ratio_high", "mapped_ratio_top20_high", "strict"]
+            for group_col in group_cols:
+                group_dfs[group_col] = filtered_df[filtered_df[group_col]].reset_index(drop=True).copy()
+                logger.info(f"   Created group dataframe for {group_col}: {group_dfs[group_col].shape}")
+            group_dfs["full"] = filtered_df.copy()
+            group_cols.append("full")
+            logger.info(f"   Full dataframe size is: {group_dfs['full'].shape}")
 
 
          # Step 2: Run ingredient-nutrient optimization 
@@ -258,24 +272,27 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         
         # Step 3: Train and evaluate ML prediction models 
         logger.info("Step 3: Training and evaluating ML prediction models")
-        feature_sets = {
-            "nut8": C.NUT8,
-            "nut8+binary": C.NUT8 + binary_cols,
-            "nut8+score": C.NUT8 + score_cols,
-            "nut8+umap_10": C.NUT8 + umap_cols,
-        }
+        #feature_sets = {
+        #    "nut8": C.NUT8,
+        #    "nut8+binary": C.NUT8 + binary_cols,
+        #    "nut8+score": C.NUT8 + score_cols,
+        #    "nut8+umap_10": C.NUT8 + umap_cols,
+        #}
         
-        ml_metrics = {}
-        ml_output_dfs = {}
-        models_dicts = {}
-        for group_name, group_df in group_dfs.items():
-            ml_metrics[group_name], models_dicts[group_name], ml_output_dfs[group_name] = train_tree_models(group_df, feature_sets, C.TARGET_NUT3, cv=args.cv, group_name=group_name, outdir=outdir)
+        #ml_metrics = {}
+        #ml_output_dfs = {}
+        #models_dicts = {}
+        #for group_name, group_df in group_dfs.items():
+        #    ml_metrics[group_name], models_dicts[group_name], ml_output_dfs[group_name] = train_tree_models(group_df, feature_sets, C.TARGET_NUT3, cv=args.cv, group_name=group_name, outdir=outdir)
 
         # Step 4: Save outputs
         logger.info("Step 4: Saving outputs")
         
         # Get id columns
-        id_cols = ['id_col', 'SampleType'] + filtered_df.columns[:3].tolist() 
+        id_cols = ['id_col', 'SampleType'] 
+        if 'fdc_id' in filtered_df.columns:
+            id_cols.append('fdc_id')
+        id_cols.extend(['branded_food_category','description'])
       
         # (1) Ingredient parsing summary
         logger.info("   (1) Saving ingredient parsing summary...")
@@ -292,35 +309,37 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
             'mapped_topk_count': [len(lst) if isinstance(lst, list) else 0 for lst in filtered_df['mapped_list_topk_only']],
             'mapped_ratio': filtered_df['mapped_ratio'],
             'mapped_ratio_top20': filtered_df['mapped_ratio_top20'],
-            **{col: filtered_df[col].values for col in [col for col in group_cols if col != "full"]},
+            **{col: filtered_df[col].values for col in ["first_mapped", "mapped_ratio_high", "mapped_ratio_top20_high", "strict"]},
             **{col: filtered_df[col].values for col in binary_cols},
             **{col: filtered_df[col].values for col in score_cols}
         })
         
-        summary_filename = f"ingredient_parsing_{'test' if is_test_mode else ''}.csv"
+        summary_filename = f"ingredient_parsing_{'test' if is_test_mode else 'complete'}.csv"
         ingredient_summary.to_csv(os.path.join(outdir, summary_filename), index=False)
         logger.info(f"   Saved {summary_filename}")
         
         # (2) Ingredient weights
-        logger.info("   (2) Saving ingredient weights for first_mapped dataset...")
-        weights_df = pd.DataFrame(opt_preds_w["first_mapped"], columns=top_list)
+        logger.info("   (2) Saving ingredient weights for full dataset...")
+        weights_df = pd.DataFrame(opt_preds_w["full"], columns=top_list)
         
         # Add id and group columns
         for col in id_cols:
-            weights_df[col] = filtered_df[filtered_df["first_mapped"]][col]
+            weights_df[col] = filtered_df[col]
         
-        # Reorder columns to put id columns at the beginning
+        # Reorder columns to put id columns sat the beginning
         weights_df = weights_df[id_cols + [col for col in weights_df.columns if col not in id_cols]]
         weights_filename = f"ingredient_weights_{'test' if is_test_mode else 'complete'}.csv"
         weights_df.to_csv(os.path.join(outdir, weights_filename), index=False)
         logger.info(f"   Saved {weights_filename}")
+
         
          # (3) Saving optimization and ML predictions
         logger.info("   (3) Saving optimization and ML predictions...")
 
         all_metrics = pd.DataFrame()
         for group_name, group_df in group_dfs.items():
-            metrics = pd.concat([optimization_metrics[group_name], ml_metrics[group_name]], ignore_index=True)
+            #metrics = pd.concat([optimization_metrics[group_name], ml_metrics[group_name]], ignore_index=True)
+            metrics = optimization_metrics[group_name]
             metrics["Group"] = group_name
             if len(metrics) ==  0:
                 continue
@@ -334,24 +353,40 @@ def run_pipeline(test_size=None, random_state=42, filter_type="ingredients", fil
         logger.info("   (5) Adding predictions to filtered_df...")
         
         # Save sample info
-        df_with_preds = filtered_df[id_cols + [col for col in group_cols if col != "full"]].copy()
+        if args.groups == "full":
+            rest_group_cols = ["first_mapped", "mapped_ratio_high", "mapped_ratio_top20_high", "strict"]
+        else:
+            rest_group_cols = [col for col in group_cols]
+        df_with_preds = filtered_df[id_cols + rest_group_cols].copy()
       
-       # Add base nutrients
+        # Add base nutrients
         for nutrient in C.NUT8:
+            df_with_preds[nutrient] = filtered_df[nutrient].copy()
+
+        # Add target nutrients
+        for nutrient in C.TARGET_NUT3:
             df_with_preds[nutrient] = filtered_df[nutrient].copy()
         
         # Add optimization predictions
         for group_name, _df in group_dfs.items():
-            opt_pred_cols = [col for col in _df.columns if '_opt_' in col]
+            opt_pred_cols = [col for col in _df.columns if 'opt_' in col]
             df_with_preds = df_with_preds.merge(_df[id_cols + opt_pred_cols], on=id_cols, how='left')
     
-        # Add ML predictions
-        for group_name, ml_output_df in ml_output_dfs.items():
-            ml_pred_cols = [col for col in ml_output_df.columns if '_xgb_' in col]
-            df_with_preds = df_with_preds.merge(ml_output_df[id_cols + ml_pred_cols], on=id_cols, how='left')
+        # Add ML predictions (robust to missing id columns in ml_output_df)
+        #for group_name, ml_output_df in ml_output_dfs.items():
+        #    ml_pred_cols = [col for col in ml_output_df.columns if '_xgb_' in col]
+            # Use only id columns that exist in ml_output_df to avoid KeyError
+        #    merge_keys = [c for c in id_cols if c in ml_output_df.columns]
+        #    missing_keys = [c for c in id_cols if c not in ml_output_df.columns]
+        #    if missing_keys:
+        #        logger.warning(f"ML output for group '{group_name}' missing id columns {missing_keys}; merging on {merge_keys} only")
+        #    df_with_preds = df_with_preds.merge(
+        #        ml_output_df[merge_keys + ml_pred_cols], on=merge_keys, how='left'
+        #    )
 
         # Reorder columns for easy comparison
-        ordered_cols = id_cols + [col for col in group_cols if col != "full"] 
+        ordered_cols = id_cols + rest_group_cols
+        ordered_cols += [f'opt_pred_weights_{group_name}' for group_name in group_dfs.keys()]
         logger.info(f"DEBUGGING - CHECK nut8 columns: {C.NUT8}")
         logger.info(f"DEBUGGING - CHECK target nutrient columns: {C.TARGET_NUT3}")
         for nutrient in C.TARGET_NUT3:
@@ -442,7 +477,7 @@ OUTPUT FILES GENERATED:
 EXECUTION STATUS: COMPLETED SUCCESSFULLY
         """
         
-        summary_filename = f"execution_summary_{'test' if is_test_mode else ''}.txt"
+        summary_filename = f"execution_summary_{'test' if is_test_mode else 'complete'}.txt"
         with open(os.path.join(outdir, summary_filename), "w") as f:
             f.write(summary_report)
         logger.info(f"   Saved {summary_filename}")
@@ -502,6 +537,8 @@ if __name__ == "__main__":
     ap.add_argument("--opt-scale", type=str, default="std",
                     choices=["std", "pminmax", "logiqr"],
                     help="Scaling mode for optimization: std (default), pminmax, logiqr")
+    ap.add_argument("--groups", choices=["all", "full"], default="all",
+                    help="Run metrics/predictions for all groups or only the 'full' group")
     args = ap.parse_args()
     
     # Determine mode
