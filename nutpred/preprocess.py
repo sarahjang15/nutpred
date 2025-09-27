@@ -148,7 +148,8 @@ def ensure_mapped_list_column(
         out: List[str] = []
         for term in lst:
             t = str(term).strip().lower()
-            out.append(mapping.get(t, t))
+            mapped = mapping.get(t, t)
+            out.append(str(mapped).upper())
         return out
 
     food_df = food_df.copy()
@@ -236,7 +237,7 @@ def make_topk(food_df: pd.DataFrame, k: int) -> List[str]:
             freq.update(lst)
     return [ing for ing, _ in freq.most_common(k)]
 
-def extract_topk_from_ingnut(ingnut_df: pd.DataFrame, k: int = None) -> Tuple[pd.DataFrame, List[str]]:
+def extract_topk_from_ingnut(ingnut_df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
     """Extract top-k ingredients from ingnut_df with deduplication, keeping first occurrence."""
     ingredient_col = "ing"
     
@@ -248,6 +249,14 @@ def extract_topk_from_ingnut(ingnut_df: pd.DataFrame, k: int = None) -> Tuple[pd
     # Keep only the first occurrence of each ingredient
     filtered_ingnut_df = ingnut_df.drop_duplicates(subset=[ingredient_col], keep='first')
     unique_ingredients = filtered_ingnut_df[ingredient_col].tolist()
+    unique_ingredients = [ing.upper() for ing in unique_ingredients] # Convert to uppercase for case-insensitive matching
+    
+    # Concise alignment check and example (first 5)
+    ing_upper_order = filtered_ingnut_df[ingredient_col].astype(str).str.upper().tolist()
+    aligned = (unique_ingredients == ing_upper_order)
+    logger.info(f"Top-list alignment with ingnut_df rows: {aligned}")
+    logger.info(f"Example top_list vs ingnut rows (first 5): {unique_ingredients[:5]} vs {ing_upper_order[:5]}")
+    
     logger.info(f"Extracted {len(unique_ingredients)} unique ingredients from ingnut_df (keeping first occurrence)")
     logger.info(f"Filtered ingnut_df from {len(ingnut_df)} to {len(filtered_ingnut_df)} rows")
     logger.info(f"Removed {len(ingnut_df) - len(filtered_ingnut_df)} duplicate ingredient rows")
@@ -268,6 +277,7 @@ def filter_ingredients_to_topk(food_df: pd.DataFrame, top_list: List[str]) -> pd
         filtered_list = []
 
         for ingredient in ingredient_list:
+            ingredient = str(ingredient).upper()
             # Check if the ingredient (or its base name) is in top_list
             if ingredient in top_list:
                 filtered_list.append(ingredient)
@@ -425,7 +435,7 @@ def make_filters(food_df: pd.DataFrame) -> pd.DataFrame:
         food_df[filter['name']] = food_df.apply(filter['condition'], axis=1)
     return food_df
         
-def preprocess_pipeline(food_df: pd.DataFrame, ingnut_df: pd.DataFrame, k: int = 133) -> pd.DataFrame:
+def preprocess_pipeline(food_df: pd.DataFrame, ingnut_df: pd.DataFrame) -> pd.DataFrame:
     """
     Complete ingredient processing pipeline:
     0. Make id column
@@ -437,7 +447,7 @@ def preprocess_pipeline(food_df: pd.DataFrame, ingnut_df: pd.DataFrame, k: int =
     logger.info("Preprocessing ingredients...")
 
     # Step 1: Extract top-k ingredients from ingnut_df
-    ingnut_df, top_list = extract_topk_from_ingnut(ingnut_df, k=k)
+    ingnut_df, top_list = extract_topk_from_ingnut(ingnut_df)
     
     # Step 2: Filter to top-k 
     food_df = filter_ingredients_to_topk(food_df, top_list)
