@@ -103,13 +103,9 @@ def predict_ingnut_weights_and_targets(food_df: pd.DataFrame, ingnut_df: pd.Data
         
         logger.info(f"Data shapes: X_all={X_all.shape}, Y_mat={Y_mat.shape}, K={len(ingnut_df)} ingredients")
         
-        # Create name to index mapping
-        name_to_idx = {name: idx for idx, name in enumerate(ingnut_df.columns)}
-        logger.info(f"Created name_to_idx mapping for {len(name_to_idx)} ingredients")
-        
         # Map ingredients to ingredients
         logger.info("Mapping ingredients to indices...")
-        mapped_tokens = []
+        mapped_tokens = [] # list of lists, each list is a list of indices of the ingredients in the top_list
 
         for j, (_, row) in enumerate(food_df.iterrows()):
             tokens = row.get("mapped_list_topk_only", [])
@@ -123,6 +119,7 @@ def predict_ingnut_weights_and_targets(food_df: pd.DataFrame, ingnut_df: pd.Data
                     row_tokens.append(idx)
             
             mapped_tokens.append(row_tokens)
+
         
         logger.info(f"Mapping complete: {len(mapped_tokens)} samples processed")
         
@@ -162,6 +159,26 @@ def predict_ingnut_weights_and_targets(food_df: pd.DataFrame, ingnut_df: pd.Data
             else:
                 logger.warning(f"Target nutrient {ingnut_col} not found in ingnut_df, skipping {target}")      
              
+        # Add per-row list of weights aligned to mapped_list_topk_only
+        try:
+            opt_pred_weights = []
+            for i in range(len(food_df)):
+                tokens = food_df.iloc[i].get("mapped_list_topk_only", [])
+                if not isinstance(tokens, list):
+                    tokens = []
+                row_weights = []
+                for tok in tokens:
+                    try:
+                        idx = top_list.index(tok)
+                        row_weights.append(float(preds_w[i, idx]))
+                    except ValueError:
+                        row_weights.append(0.0)
+                opt_pred_weights.append(row_weights)
+            food_df[f"opt_pred_weights_{group_name}"] = opt_pred_weights
+            logger.info("Added column with per-food weights aligned to mapped_list_topk_only")
+        except Exception as e:
+            logger.warning(f"Failed to add opt_pred_weights column: {e}")
+
         # Return the weights matrix that was used for predictions
         return food_df, preds_w, failed
         
@@ -191,7 +208,7 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
         logger.warning(f"Solver {solver_name} not available, falling back to OSQP")
         solver_name = "osqp"
     solver_enum = solver_map[solver_name]
-    solver_kwargs = dict(eps_abs=1e-6, eps_rel=1e-6, verbose=False, max_iter=100000, polish=True)
+    solver_kwargs = dict(eps_abs=1e-9, eps_rel=1e-9, verbose=False, max_iter=100000, polish=True)
     logger.info(f"Using solver: {solver_name}")
     
     # Prepare optimization matrices
@@ -216,6 +233,7 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
     # Solve per snack
     logger.info("Starting optimization for each sample...")
     
+    # jth sample is optimized with the ingredients in the jth list of mapped_tokens
     for j, Sj in enumerate(mapped_tokens):
         if j % 100 == 0:  # Progress update every 100 samples
             logger.info(f"Optimization progress: {j}/{n_snack} samples completed, {len(failed)} failed")
@@ -226,10 +244,11 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
             
         Kj = len(Sj)
         Xj = X_full[:, Sj]
-        var = cp.Variable(Kj, nonneg=True)
+        var = cp.Variable(Kj, pos=True) # positive
         
         # Set up constraints based on constraint mode
         cons = []
+        #cons.append(var >= 0.001)
         if constraint in ("eq1", "eq1_mono"):
             cons.append(cp.sum(var) == 1)
         elif constraint in ("le1", "le1_mono"):
@@ -301,7 +320,7 @@ def eval_ing_pred(df: pd.DataFrame, group_name: str = None) -> pd.DataFrame:
             yhat_eval = yhat[eval_mask]
                     
             r2_eval = r2_score(y_eval, yhat_eval)
-            rmse_eval = float(mean_squared_error(y_eval, yhat_eval))
+            rmse_eval = float(mean_squared_error(y_eval, yhat_eval, squared=False))
             mae_eval = float(mean_absolute_error(y_eval, yhat_eval))
             mape_eval = float(mean_absolute_percentage_error(y_eval + 1e-6, yhat_eval))
             s_eval = smape(y_eval + 1e-6, yhat_eval)
