@@ -35,6 +35,7 @@ def compare_feature_sets(metrics_df: pd.DataFrame = None, metrics_file_path: str
     # Define metrics to include
     metrics_to_plot = ['R2', 'RMSE', 'SMAPE']
     
+
     # Create separate heatmaps for each nutrient: ModelType (rows) × Group (columns)
     for nutrient in C.TARGET_NUT3:
         n_metrics = len(metrics_to_plot)
@@ -58,7 +59,7 @@ def compare_feature_sets(metrics_df: pd.DataFrame = None, metrics_file_path: str
             # Reorder rows to put optimization first, then feature sets
             model_order = [col for col in pivot.index]
             pivot = pivot.reindex(model_order)
-            pivot = pivot[C.GROUP_COLS]
+            pivot = pivot[[x for x in C.GROUP_COLS if x in pivot.columns]]
             
             # Create heatmap
             sns.heatmap(pivot, annot=True, fmt='.3f', cmap='Blues', 
@@ -90,35 +91,41 @@ def create_scatterplots(pred_file_path: str = None, outdir: str = None):
     # Get all prediction columns
     food_df = pd.read_csv(pred_file_path)
     pred_cols =  []
-    for nutrient in C.TARGET_NUT3:
+    for nutrient in C.NUT11:
         pred_cols.extend([col for col in food_df.columns if f'{nutrient}_' in col])
     pred_cols = [x for x in pred_cols if 'full' in x and x[-2] != "."]
 
     # Create scatterplots for each nutrient, model type, and group
-    for nutrient in C.TARGET_NUT3:
-        for pred_col in pred_cols:
-            logger.info(f"Creating scatterplot for {nutrient} - {pred_col}")
-            if "xgb" in pred_col:
-               feature_set = pred_col.split('xgb_full_')[1]
-               data = food_df[food_df['SampleType'] == 'test'][[nutrient, pred_col]]       
-               plt.figure(figsize=(10, 8))                   
-               sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5, hue=data['mapped_ratio_high'])
-               plt.title(f'Scatterplot: {nutrient} - xgb - full - {feature_set}')
-               plt.xlabel('True')
-               plt.ylabel('Predicted')
-               plt.axline((0, 0), (1, 1), color='black', linestyle='--')
-               plt.savefig(os.path.join(plots_dir, f'scatterplot_{nutrient}_xgb_full_{feature_set}.png'))
-            elif "opt" in pred_col:
-                data = food_df[[nutrient, pred_col]]       
-                plt.figure(figsize=(10, 8))
-                sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5, hue=data['mapped_ratio_high'])
-                plt.title(f'Scatterplot: {nutrient} - opt - full')
+    for pred_col in pred_cols:
+        logger.info(f"Creating scatterplot for {nutrient} - {pred_col}")
+        nutrient = pred_col.split('_')[0]
+        if "xgb" in pred_col:
+            feature_set = pred_col.split('xgb_full_')[1]
+            data = food_df[food_df['SampleType'] == 'test'][[nutrient, pred_col, 'first_mapped', 'mapped_ratio_top20_high']]
+            if 'Group' in data.columns:
+                data =  data.query('Group == "full"')
+            for typ in ['first_mapped', 'mapped_ratio_top20_high']:
+                plt.figure(figsize=(10, 8))                   
+                sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5, hue=data[typ])
+                plt.title(f'Scatterplot: {nutrient} - xgb - full - {feature_set} - {typ}')
                 plt.xlabel('True')
                 plt.ylabel('Predicted')
                 plt.axline((0, 0), (1, 1), color='black', linestyle='--')
-                plt.savefig(os.path.join(plots_dir, f'scatterplot_{nutrient}_opt_full.png'))
-            else:
-                logger.warning(f"Scatterplot not found for {pred_col}")
+                plt.savefig(os.path.join(plots_dir, f'scatterplot_{nutrient}_xgb_full_{feature_set}_{typ}.png'))
+        elif "opt" in pred_col:
+            data = food_df[[nutrient, pred_col, 'first_mapped', 'mapped_ratio_top20_high']]   
+            if 'Group' in data.columns:
+                data =  data.query('Group == "full"')
+            for typ in ['first_mapped', 'mapped_ratio_top20_high']:
+                plt.figure(figsize=(10, 8))
+                sns.scatterplot(x=data[nutrient], y=data[pred_col], alpha=0.5, hue=data[typ])
+                plt.title(f'Scatterplot: {nutrient} - opt - full - {typ}')
+                plt.xlabel('True')
+                plt.ylabel('Predicted')
+                plt.axline((0, 0), (1, 1), color='black', linestyle='--')
+                plt.savefig(os.path.join(plots_dir, f'scatterplot_{nutrient}_opt_full_{typ}.png'))
+        else:
+            logger.warning(f"Scatterplot not found for {pred_col}")
 
 def create_shap_plots(food_df: pd.DataFrame, models_dict: dict, feature_sets: dict, outdir: str):
     """Create SHAP plots for XGBoost models."""
