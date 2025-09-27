@@ -9,6 +9,9 @@ nutpred_*.log
 # Previous versions
 run_nutpred_complete.py
 run_nutpred_test.py 
+nutpred/pred_by_ingnut copy.py
+nutpred/pred_by_ingnut_zero.py
+*pred_by_ingnut_zero.py
 
 # Output directories
 outputs*/
@@ -30,6 +33,11 @@ nohup.out
 # data
 data/branded_food.csv
 data/snack_change_to_zero.csv
+data/snack_input_*
+data/snack_umap_added.csv
+data/snacks_changed_zero_0924.csv
+data/snacks_preprocessed_full_0924.csv
+
 
 # Python
 __pycache__/
