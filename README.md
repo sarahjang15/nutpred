@@ -59,7 +59,7 @@ This repo provides a clean, reproducible pipeline with concise, side-by-side tru
     --random-state 42 \
     --filter-type ingredients \
     --filter-values popcorn pretzel pretzels \
-    --food-df data/snack_input_df.csv \
+    --food-df data/snack_preprocessed_nona_0924.csv \
     --thesaurus-df data/THESAURUSFORPUBLICRELEASE.XLSX \
     --ingnut-df data/ingnut_df_top135.csv \
     --outdir ./my_outputs \
@@ -128,20 +128,21 @@ nutpred/
 │   ├── __init__.py
 │   ├── cleaning.py           # robust ingredient text cleaner
 │   ├── metrics.py            # r2_manual (SSR/SST), SMAPE
+│   ├── prepare.py            # code to prepare data files in **data** folder (not included in run.py pipeline) 
 │   ├── preprocess.py         # load → map to thesaurus → filter → top-K → binary/score → expand umap_10
 │   ├── pred_by_ingnut.py     # CVXPY optimizer → ing_pred (and its metrics)
 │   ├── pred_by_fullnut.py    # XGBoost/RF for: nut8, nut8+binary, nut8+score, nut8+umap_10
 │   ├── viz.py                # heatmaps for R², RMSE, SMAPE
 │   └── requirements.txt      # Python dependencies
-├── data/                     # Input data (not tracked by git)
-│   ├── snack_input_df.csv
+├── data/                     # Input data 
+│   ├── snack_preprocessed_nona_0924.csv  # Updated snack input df file
 │   ├── THESAURUSFORPUBLICRELEASE.XLSX
-│   └── ingnut_df_top135.csv
+│   └── ingnut_df_top200.csv # Updated ingredient nutrient df file
 ├── test_outputs/             # Test mode outputs 
 │
 ├── complete_outputs/         # Complete mode outputs 
 │
-└── logs/                     # Log files (not tracked by git)
+└── logs/                     # Log files 
     └── nutpred.log
 ```
 
