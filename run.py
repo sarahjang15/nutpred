@@ -517,9 +517,9 @@ if __name__ == "__main__":
                        help="Values to filter by (ingredient keywords or category names)")
 
     # File paths
-    ap.add_argument("--food-df", type=str, default="data/snack_input_df.csv")
+    ap.add_argument("--food-df", type=str, default="data/snacks_preprocessed_nona_0924.csv")
     ap.add_argument("--thesaurus-df", type=str, default="data/THESAURUSFORPUBLICRELEASE.XLSX")
-    ap.add_argument("--ingnut-df", type=str, default="data/ingnut_df_top135.csv")
+    ap.add_argument("--ingnut-df", type=str, default="data/ingnut_df_top200.csv")
     ap.add_argument("--outdir", type=str, default="./nutpred_outputs")
 
     # Tree-based prediction modeling
@@ -537,8 +537,8 @@ if __name__ == "__main__":
     ap.add_argument("--opt-scale", type=str, default="std",
                     choices=["std", "pminmax", "logiqr"],
                     help="Scaling mode for optimization: std (default), pminmax, logiqr")
-    ap.add_argument("--groups", choices=["all", "full"], default="all",
-                    help="Run metrics/predictions for all groups or only the 'full' group")
+    ap.add_argument("--groups", choices=["all", "full"], default="full",
+                    help="Run metrics/predictions for all groups (first_mapped, mapped_ratio_high, strict, full) or only the 'full' group")
     args = ap.parse_args()
     
     # Determine mode
