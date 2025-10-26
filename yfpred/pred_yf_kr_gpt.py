@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def predict_yield_factors_gpt(food_df: pd.DataFrame, korean_ingnut_df: pd.DataFrame, nut8_cols: List[str], 
                              korean_ingnut_cols: List[str], api_key: str = None, model: str = "gpt-5",
-                             group_name: str = None, max_yield_factor: float = 1.0) -> Tuple[pd.DataFrame, np.ndarray, List[int], List[Dict]]:
+                             group_name: str = None, max_yield_factor: float = 1.0, outdir: str = "./") -> Tuple[pd.DataFrame, np.ndarray, List[int], List[Dict]]:
     """
     Predict yield factors for Korean ingredients using GPT-5 API.
     
@@ -29,6 +29,7 @@ def predict_yield_factors_gpt(food_df: pd.DataFrame, korean_ingnut_df: pd.DataFr
         model: GPT model to use ("gpt-5", "gpt-4", "gpt-4o")
         group_name: Name for the prediction group
         max_yield_factor: Maximum allowed yield factor
+        outdir: Output directory for saving evidence file (default: "./")
         
     Returns:
         food_df: Updated DataFrame with yield factor predictions
@@ -205,7 +206,9 @@ def predict_yield_factors_gpt(food_df: pd.DataFrame, korean_ingnut_df: pd.DataFr
     # Save evidence to file
     try:
         import json
-        evidence_filename = f"gpt_evidence_{group_name if group_name else 'gpt'}.json"
+        # Create output directory if it doesn't exist
+        os.makedirs(outdir, exist_ok=True)
+        evidence_filename = os.path.join(outdir, f"gpt_evidence_{group_name if group_name else 'gpt'}.json")
         with open(evidence_filename, 'w', encoding='utf-8') as f:
             json.dump(evidence_list, f, ensure_ascii=False, indent=2)
         logger.info(f"GPT evidence saved to: {evidence_filename}")

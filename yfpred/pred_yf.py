@@ -7,6 +7,7 @@ Tests if sum(ing_nut / yf) = food_nut equation works correctly.
 import pandas as pd
 import numpy as np
 import ast
+import os
 from pred_yf_kr import predict_yield_factors
 from pred_yf_kr_gpt import predict_yield_factors_gpt
 import nutpred.constants as C
@@ -69,7 +70,10 @@ def create_perfect_test_case(food_df, ingnut_df, nut_cols):
 
 def test_yield_factor_equation(nut_cols=None, scale="none", ridge=0.01, robust=False, 
                                solver_name="osqp", resolver="rule", test_case="real", error_type="l2", 
-                               max_yield_factor=1.0, method="optimization", api_key=None, gpt_model="gpt-5"):
+                               max_yield_factor=1.0, method="optimization", api_key=None, gpt_model="gpt-5",
+                               outdir="./", food_df_path="potato_example_foodnut.csv", 
+                               ingnut_df_path="potato_example_ingnut.csv", output_excel_name="potato_example_output.xlsx",
+                               output_matrix_name="yield_factors_matrix.npy"):
     """
     Test if the yield factor equation sum(ing_nut / yf) = food_nut works.
     
@@ -84,6 +88,11 @@ def test_yield_factor_equation(nut_cols=None, scale="none", ridge=0.01, robust=F
         method: "optimization" or "gpt" (default: optimization)
         api_key: OpenAI API key (required for GPT method)
         gpt_model: GPT model to use ("gpt-5", "gpt-4", "gpt-4o")
+        outdir: Output directory for saving results (default: "./")
+        food_df_path: Path to food DataFrame CSV file
+        ingnut_df_path: Path to ingredient-nutrient DataFrame CSV file
+        output_excel_name: Name of output Excel file
+        output_matrix_name: Name of output numpy matrix file
     """
     
     print("="*80)
@@ -101,8 +110,8 @@ def test_yield_factor_equation(nut_cols=None, scale="none", ridge=0.01, robust=F
     
     # Load data
     print("Loading data...")
-    food_df = pd.read_csv('potato_example_foodnut.csv')
-    ingnut_df = pd.read_csv('potato_example_ingnut.csv')
+    food_df = pd.read_csv(food_df_path)
+    ingnut_df = pd.read_csv(ingnut_df_path)
 
     if test_case == "perfect":
         # Create a perfect test case where the equation should work exactly
@@ -148,7 +157,8 @@ def test_yield_factor_equation(nut_cols=None, scale="none", ridge=0.01, robust=F
             api_key=api_key,
             model=gpt_model,
             group_name="korean_yf",
-            max_yield_factor=max_yield_factor
+            max_yield_factor=max_yield_factor,
+            outdir=outdir
         )
     else:
         # Use optimization method
@@ -256,24 +266,31 @@ def test_yield_factor_equation(nut_cols=None, scale="none", ridge=0.01, robust=F
     print(f"Maximum error: {np.max(total_errors):.2f}")
     print(f"Minimum error: {np.min(total_errors):.2f}")
     
+    # Create output directory if it doesn't exist
+    os.makedirs(outdir, exist_ok=True)
+    
     # Save results
-    food_df_with_predictions.to_excel('potato_example_output.xlsx', index=False)
-    print(f"\nResults saved to: potato_example_output.xlsx")
+    output_excel_path = os.path.join(outdir, output_excel_name)
+    food_df_with_predictions.to_excel(output_excel_path, index=False)
+    print(f"\nResults saved to: {output_excel_path}")
     
     # Show evidence column info if using GPT method
     if method == "gpt":
-        evidence_col = f"gpt_evidence_{group_name if 'group_name' in locals() else 'gpt'}"
+        evidence_col = "gpt_evidence"
         if evidence_col in food_df_with_predictions.columns:
             print(f"GPT evidence saved in column: {evidence_col}")
             print("Evidence includes: processing method, analysis, industry basis, confidence, and yield factor reasoning")
     
     # Save yield factor matrix
-    np.save('yield_factors_matrix.npy', yf_preds)
-    print(f"Yield factor matrix saved to: yield_factors_matrix.npy")
+    yf_matrix_path = os.path.join(outdir, output_matrix_name)
+    np.save(yf_matrix_path, yf_preds)
+    print(f"Yield factor matrix saved to: {yf_matrix_path}")
     
     return food_df_with_predictions, yf_preds
 
-def run_test_suite():
+def run_test_suite(outdir="./", food_df_path="potato_example_foodnut.csv", 
+                   ingnut_df_path="potato_example_ingnut.csv", output_excel_name="potato_example_output.xlsx",
+                   output_matrix_name="yield_factors_matrix.npy"):
     """Run various test cases with different parameters."""
     
     print("="*80)
@@ -284,7 +301,9 @@ def run_test_suite():
     print("\n" + "="*60)
     print("TEST 1: Perfect Test Case (should have zero error)")
     print("="*60)
-    test_yield_factor_equation(test_case="perfect", scale="none", ridge=0.0)
+    test_yield_factor_equation(test_case="perfect", scale="none", ridge=0.0, outdir=outdir,
+                               food_df_path=food_df_path, ingnut_df_path=ingnut_df_path,
+                               output_excel_name=output_excel_name, output_matrix_name=output_matrix_name)
     
     # Test 2: Real data with different scaling methods
     print("\n" + "="*60)
@@ -293,7 +312,9 @@ def run_test_suite():
     
     for scale in ["none", "std", "pminmax"]:
         print(f"\n--- Scale: {scale} ---")
-        test_yield_factor_equation(scale=scale, ridge=0.01)
+        test_yield_factor_equation(scale=scale, ridge=0.01, outdir=outdir,
+                                   food_df_path=food_df_path, ingnut_df_path=ingnut_df_path,
+                                   output_excel_name=output_excel_name, output_matrix_name=output_matrix_name)
     
     # Test 3: Different nutrient combinations
     print("\n" + "="*60)
@@ -303,12 +324,16 @@ def run_test_suite():
     # Test with only energy and carbohydrates
     energy_carb = ["Energy(kcal)", "Carbohydrate(g)"]
     print(f"\n--- Nutrients: {energy_carb} ---")
-    test_yield_factor_equation(nut_cols=energy_carb, scale="none")
+    test_yield_factor_equation(nut_cols=energy_carb, scale="none", outdir=outdir,
+                              food_df_path=food_df_path, ingnut_df_path=ingnut_df_path,
+                              output_excel_name=output_excel_name, output_matrix_name=output_matrix_name)
     
     # Test with only protein and fat
     protein_fat = ["Protein(g)", "Total fat(g)"]
     print(f"\n--- Nutrients: {protein_fat} ---")
-    test_yield_factor_equation(nut_cols=protein_fat, scale="none")
+    test_yield_factor_equation(nut_cols=protein_fat, scale="none", outdir=outdir,
+                              food_df_path=food_df_path, ingnut_df_path=ingnut_df_path,
+                              output_excel_name=output_excel_name, output_matrix_name=output_matrix_name)
     
     # Test 4: Different regularization parameters
     print("\n" + "="*60)
@@ -317,7 +342,9 @@ def run_test_suite():
     
     for ridge in [0.0, 0.01, 0.1, 1.0]:
         print(f"\n--- Ridge: {ridge} ---")
-        test_yield_factor_equation(ridge=ridge, scale="none")
+        test_yield_factor_equation(ridge=ridge, scale="none", outdir=outdir,
+                                   food_df_path=food_df_path, ingnut_df_path=ingnut_df_path,
+                                   output_excel_name=output_excel_name, output_matrix_name=output_matrix_name)
 
 if __name__ == "__main__":
     import argparse
@@ -351,12 +378,23 @@ if __name__ == "__main__":
                        help="GPT model to use (default: gpt-5)")
     parser.add_argument("--run-suite", action="store_true", 
                        help="Run full test suite instead of single test")
+    parser.add_argument("--outdir", default="./", 
+                       help="Output directory for saving results (default: ./)")
+    parser.add_argument("--food-df", default="potato_example_foodnut.csv",
+                       help="Path to food DataFrame CSV file (default: potato_example_foodnut.csv)")
+    parser.add_argument("--ingnut-df", default="potato_example_ingnut.csv",
+                       help="Path to ingredient-nutrient DataFrame CSV file (default: potato_example_ingnut.csv)")
+    parser.add_argument("--output-excel", default="potato_example_output.xlsx",
+                       help="Name of output Excel file (default: potato_example_output.xlsx)")
+    parser.add_argument("--output-matrix", default="yield_factors_matrix.npy",
+                       help="Name of output numpy matrix file (default: yield_factors_matrix.npy)")
     
     args = parser.parse_args()
     
     if args.run_suite:
         # Run full test suite
-        run_test_suite()
+        run_test_suite(outdir=args.outdir, food_df_path=args.food_df, ingnut_df_path=args.ingnut_df,
+                      output_excel_name=args.output_excel, output_matrix_name=args.output_matrix)
     else:
         # Define nutrient sets
         if args.nutrients == "nut6":
@@ -395,5 +433,10 @@ if __name__ == "__main__":
             max_yield_factor=args.max_yield_factor,
             method=args.method,
             api_key=args.api_key,
-            gpt_model=args.gpt_model
+            gpt_model=args.gpt_model,
+            outdir=args.outdir,
+            food_df_path=args.food_df,
+            ingnut_df_path=args.ingnut_df,
+            output_excel_name=args.output_excel,
+            output_matrix_name=args.output_matrix
         )
