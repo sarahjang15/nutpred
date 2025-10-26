@@ -3,6 +3,15 @@ NUT8 = [
     'Sodium(mg)', 'Total sugar(g)', 'Saturated fatty acids(g)', 'Cholesterol(mg)'
 ]
 
+NUT5 = [
+    'Energy(kcal)', 'Carbohydrate(g)', 'Protein(g)',
+    'Sodium(mg)', 'Total sugar(g)', 'Saturated fatty acids(g)', 'Cholesterol(mg)'
+]
+
+NUT4 = [
+    'Energy(kcal)', 'Carbohydrate(g)', 'Total fat(g)', 'Protein(g)'
+]
+
 NUT3 = [
     'Carbohydrate(g)', 'Total fat(g)', 'Protein(g)'
 ]
