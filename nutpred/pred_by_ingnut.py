@@ -126,7 +126,7 @@ def predict_ingnut_weights_and_targets(food_df: pd.DataFrame, ingnut_df: pd.Data
         logger.info("Running optimization on all samples...")
         preds_w, failed = _run_optimization(
             mapped_tokens, X_all, Y_mat, constraint=constraint, ridge=ridge, 
-            robust=robust, solver_name=solver_name, scale=scale, top_list=top_list
+            robust=robust, solver_name=solver_name, scale=scale, top_list=top_list, food_df=food_df
         )
         
         logger.info(f"Optimization complete. Weight matrix: {preds_w.shape}")
@@ -189,7 +189,8 @@ def predict_ingnut_weights_and_targets(food_df: pd.DataFrame, ingnut_df: pd.Data
 
 def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: np.ndarray,
                      constraint: str = "nnls_mono", ridge: float = 0.0, robust: bool = False,
-                     solver_name: str = "osqp", scale: str = "std", top_list: List[str] = None) -> Tuple[np.ndarray, List[str], List[int]]:
+                     solver_name: str = "osqp", scale: str = "std", top_list: List[str] = None, 
+                     food_df: pd.DataFrame = None) -> Tuple[np.ndarray, List[str], List[int]]:
     """
     Run optimization for all samples and return weights matrix, variant universe, and failed indices.
     
@@ -216,6 +217,7 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
     n_snack, p = Y_mat.shape  # Number of samples, number of nutrients
     X_full = X_all.T    # (D, K) - transpose for optimization
     
+    
     # Calculate scaling weights
     logger.info(f"Calculating scaling weights using mode: {scale}")
     W_vec = make_residual_weights(X_full, Y_mat, mode=scale)  # length p
@@ -229,6 +231,11 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
         """Loss function with optional ridge regularization"""
         base = cp.sum_squares(expr) if not robust else cp.sum(cp.huber(expr, 1.0))
         return base + (ridge * cp.sum_squares(var) if ridge > 0 else 0)
+    
+
+    logger.info("Loading food yield factors...")
+    import pickle
+    food_yield_factors = pickle.load(open("data/yf_by_food.pkl", "rb"))
     
     # Solve per snack
     logger.info("Starting optimization for each sample...")
@@ -244,11 +251,15 @@ def _run_optimization(mapped_tokens: List[List[int]], X_all: np.ndarray, Y_mat: 
             
         Kj = len(Sj)
         Xj = X_full[:, Sj]
+        fdc_id = int(food_df.iloc[j]['fdc_id'])
+        yf_full = food_yield_factors.get(fdc_id, np.ones(K))
+        yf_j = yf_full[Sj]
+        Xj = Xj / yf_j[np.newaxis, :]
         var = cp.Variable(Kj, pos=True) # positive
         
         # Set up constraints based on constraint mode
         cons = []
-        #cons.append(var >= 0.001)
+        #cons.append(var >= 0.001) # positive constraint
         if constraint in ("eq1", "eq1_mono"):
             cons.append(cp.sum(var) == 1)
         elif constraint in ("le1", "le1_mono"):
