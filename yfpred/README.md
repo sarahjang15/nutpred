@@ -214,26 +214,6 @@ print(evidence[0]['evidence']['analysis'])
 
 ---
 
-## Key Concepts
-
-### Ingredient State Interpretation
-- **No state descriptors** (e.g., "감자", "CORN") → **RAW/FRESH state** → YF < 1.0
-- **Has state descriptors** (e.g., "옥수수전분", "WHEAT FLOUR") → **PROCESSED state** → YF ≈ 1.0
-
-### Processing Effects
-- **Deep frying**: Oil absorption increases fat, but YF ≤ 1.0
-- **Baking/cooking**: Water loss, nutrient degradation (YF < 1.0)
-- **Drying**: Concentration of nutrients (YF ≤ 1.0)
-- **Raw ingredients**: Significant loss during processing (YF < 1.0)
-- **Processed ingredients**: Minimal change (YF ≈ 1.0)
-
-### Constraint Enforcement
-- **Critical**: Yield factors MUST satisfy **0 < YF ≤ 1.0**
-- **Optimization**: Enforces `b >= 1/max_yield_factor` constraint
-- **GPT**: Automatically caps predictions at 1.0
-
----
-
 ## Dependencies
 
 - `numpy>=1.23`
@@ -243,13 +223,4 @@ print(evidence[0]['evidence']['analysis'])
 - `scikit-learn>=1.3`
 - `openai` (for GPT method)
 - `tqdm>=4.65`
-
----
-
-## See Also
-
-- Main nutpred documentation: [`../README.md`](../README.md)
-- Optimization module: [`pred_yf_kr.py`](pred_yf_kr.py)
-- GPT module: [`pred_yf_kr_gpt.py`](pred_yf_kr_gpt.py)
-- Test script: [`try_yf_kr.py`](try_yf_kr.py)
 
