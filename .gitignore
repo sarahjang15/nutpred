@@ -3,6 +3,10 @@
 logs/
 nutpred_*.log
 
+# markdown files except README.md
+*.md
+!README.md
+
 # Python notebooks
 *.ipynb
 
@@ -37,7 +41,8 @@ data/snack_input_*
 data/snack_umap_added.csv
 data/snacks_changed_zero_0924.csv
 data/snacks_preprocessed_full_0924.csv
-
+potato_example_*
+chip_kr_data*
 
 # Python
 __pycache__/
