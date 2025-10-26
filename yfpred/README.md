@@ -1,9 +1,9 @@
-# nutpred_kr — Korean Ingredient Yield Factor Prediction
+# yfpred — Yield Factor Prediction (with Korean Ingredients)
 
 This module provides tools for predicting **yield factors** for Korean ingredients in processed food products using optimization-based and GPT-based approaches.
 
 ## Overview
-
+s
 **Yield Factor (YF)** represents how nutrients change during food processing:
 - **YF < 1.0**: Nutrient loss during processing (cooking, evaporation, degradation)
 - **YF = 1.0**: No nutrient change (already processed ingredients)
