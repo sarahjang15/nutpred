@@ -20,24 +20,24 @@ The core equation solved is: **sum(ingredient_nutrition / yield_factor) ≈ food
 **Basic Usage:**
 ```bash
 # Optimization method with default parameters
-python pred_yf.py
+python main.py
 
 # Optimization method with custom parameters
-python pred_yf.py --scale logiqr --ridge 0.01 --error l2 --solver osqp
+python main.py --scale logiqr --ridge 0.01 --error l2 --solver osqp
 
 # Specify custom input and output files
-python pred_yf.py --food-df data/my_food.csv --ingnut-df data/my_ingnut.csv \
+python main.py --food-df data/my_food.csv --ingnut-df data/my_ingnut.csv \
   --outdir ./results --output-excel results.xlsx --output-matrix matrix.npy
 
 # GPT method
-python pred_yf.py --method gpt --gpt-model gpt-5 --api-key YOUR_API_KEY
+python main.py --method gpt --gpt-model gpt-5 --api-key YOUR_API_KEY
 
 # Test with different nutrient sets
-python pred_yf.py --nutrients nut6  # 6 nutrients
-python pred_yf.py --nutrients nut8  # 8 nutrients (default)
+python main.py --nutrients nut6  # 6 nutrients
+python main.py --nutrients nut8  # 8 nutrients (default)
 
 # Run full test suite
-python pred_yf.py --run-suite
+python main.py --run-suite
 ```
 
 **Arguments:**
